@@ -8,8 +8,12 @@ func main() {
 	rootCmd := &cobra.Command{}
 
 	createCmd.AddCommand(createWalletCmd)
+	createCmd.AddCommand(createNodeCmd)
+
+	listCmd.AddCommand(listBlockCmd)
 
 	rootCmd.AddCommand(createCmd)
+	rootCmd.AddCommand(listCmd)
 
 	rootCmd.Execute()
 }

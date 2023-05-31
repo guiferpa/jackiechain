@@ -1,11 +1,22 @@
 package api
 
-import "net/http"
+import (
+	"fmt"
+	"net/http"
 
-func Run() {
-	if err := http.ListenAndServe(":3000", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	"github.com/go-chi/chi/v5"
+	"github.com/guiferpa/jackchain/blockchain"
+	"github.com/unrolled/render"
+)
 
-	})); err != nil {
-		panic(err)
-	}
+func Run(chain blockchain.Chain, port string) {
+	router := chi.NewRouter()
+
+	rnd := render.New()
+
+	router.Get("/chain", func(w http.ResponseWriter, r *http.Request) {
+		rnd.JSON(w, http.StatusOK, chain)
+	})
+
+	http.ListenAndServe(fmt.Sprintf(":%s", port), router)
 }
