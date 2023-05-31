@@ -1,0 +1,89 @@
+package blockchain
+
+import (
+	"bytes"
+	"crypto/ed25519"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+
+	"github.com/guiferpa/jackchain/wallet"
+	"github.com/mr-tron/base58"
+)
+
+type Sender struct {
+	PrivateKey ed25519.PrivateKey
+	PublicKey  ed25519.PublicKey
+}
+
+type Receiver struct {
+	PublicKey ed25519.PublicKey
+}
+
+type Transactions []Transaction
+
+func (ts Transactions) String() string {
+	b := bytes.NewBuffer([]byte(""))
+	if err := json.NewEncoder(b).Encode(ts); err != nil {
+		panic(err)
+	}
+	return b.String()
+}
+
+type Transaction struct {
+	Signature string `json:"signature"`
+	Sender    string `json:"sender"`
+	Receiver  string `json:"receiver"`
+	Amount    int64  `json:"amount"`
+}
+
+func (t *Transaction) CalculateHash() string {
+	payload := fmt.Sprintf("%s::%s::%v", t.Sender, t.Receiver, t.Amount)
+	h := sha256.New()
+	h.Write([]byte(payload))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func (t *Transaction) Sign(privKey ed25519.PrivateKey) {
+	h := t.CalculateHash()
+	s := sha256.New()
+	s.Write([]byte(h))
+	signature := ed25519.Sign(privKey, []byte(h))
+	t.Signature = hex.EncodeToString(signature)
+}
+
+func (t *Transaction) HasValidSignature() (bool, error) {
+	b, err := base58.Decode(t.Sender)
+	if err != nil {
+		return false, err
+	}
+
+	h := t.CalculateHash()
+	sig, err := hex.DecodeString(t.Signature)
+	if err != nil {
+		return false, err
+	}
+
+	return ed25519.Verify(b, []byte(h), sig), nil
+}
+
+type TransactionOptions struct {
+	Sender       wallet.Wallet
+	ReceiverAddr string
+	Amount       int64
+}
+
+func NewTransaction(opts TransactionOptions) *Transaction {
+	return &Transaction{
+		Sender:   opts.Sender.GetAddress(),
+		Receiver: opts.ReceiverAddr,
+		Amount:   opts.Amount,
+	}
+}
+
+func NewSignedTransaction(opts TransactionOptions) *Transaction {
+	t := NewTransaction(opts)
+	t.Sign(opts.Sender.PrivateKey)
+	return t
+}
