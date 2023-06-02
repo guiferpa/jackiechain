@@ -9,6 +9,7 @@ func main() {
 
 	createCmd.AddCommand(createWalletCmd)
 	createCmd.AddCommand(createNodeCmd)
+	createCmd.AddCommand(txCmd)
 
 	listCmd.AddCommand(listBlockCmd)
 

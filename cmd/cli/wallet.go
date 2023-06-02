@@ -13,18 +13,19 @@ var (
 
 func init() {
 	createWalletCmd = &cobra.Command{
-		Use:   "wallet [name]",
+		Use:   "wallet",
 		Short: "Create a wallet",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.ExactArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
-			name := args[0]
-			w, err := wallet.NewWallet(name)
+			w, err := wallet.NewWallet()
 			if err != nil {
 				fmt.Println("Error: ", err)
 			}
 
 			fmt.Println("Wallet created successful")
 			fmt.Println("Address:", w.GetAddress())
+
+			w.ExportPrivateKey()
 		},
 	}
 }

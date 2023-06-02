@@ -22,12 +22,12 @@ func init() {
 			id := args[0]
 			port := args[1]
 
-			sender, err := wallet.NewWallet("sender")
+			sender, err := wallet.NewWallet()
 			if err != nil {
 				panic(err)
 			}
 
-			receiver, err := wallet.NewWallet("receiver")
+			receiver, err := wallet.NewWallet()
 			if err != nil {
 				panic(err)
 			}
