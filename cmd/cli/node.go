@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/guiferpa/jackchain/api"
-	"github.com/guiferpa/jackchain/blockchain"
-	"github.com/guiferpa/jackchain/wallet"
+	"github.com/guiferpa/jackchain/net"
 	"github.com/spf13/cobra"
 )
 
@@ -15,36 +16,55 @@ var (
 
 func init() {
 	createNodeCmd = &cobra.Command{
-		Use:   "node [id] [port]",
+		Use:   "node [addr]",
 		Short: "Create a new node",
-		Args:  cobra.ExactArgs(2),
+		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			id := args[0]
-			port := args[1]
+			if err := cmd.ParseFlags(args); err != nil {
+				panic(err)
+			}
 
-			sender, err := wallet.NewWallet()
+			nested, err := cmd.Flags().GetString("join")
 			if err != nil {
 				panic(err)
 			}
 
-			receiver, err := wallet.NewWallet()
+			addr := args[0]
+
+			node, err := net.NewNode(addr)
 			if err != nil {
 				panic(err)
 			}
 
-			chain := blockchain.NewChain(blockchain.ChainOptions{
-				MiningDifficulty:    2,
-				MiningReward:        100,
-				PendingTransactions: nil,
-			})
+			doneCh := make(chan bool, 1)
+			errCh := make(chan error, 1)
+			sigCh := make(chan os.Signal, 1)
 
-			chain.AddTransaction(*sender, receiver.GetAddress(), 100)
+			signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGINT)
 
-			chain.MinePendingTransactions()
+			go node.Listen(doneCh, errCh)
 
-			fmt.Printf("Node (%s) is running at port: %v\n", id, port)
+			if nested != "" {
+				go node.Join(nested, doneCh, errCh)
+			}
 
-			api.Run(*chain, port)
+			for {
+				select {
+				case err := <-errCh:
+					fmt.Println(err)
+
+				case <-sigCh:
+					if err := node.Disconnect(nested); err != nil {
+						panic(err)
+					}
+
+					os.Exit(0)
+
+				default:
+				}
+			}
 		},
 	}
+
+	createNodeCmd.PersistentFlags().String("join", "", "host:port")
 }
