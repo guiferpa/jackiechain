@@ -1,10 +1,9 @@
 package blockchain
 
 import (
+	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/guiferpa/jackchain/wallet"
 )
 
 type Chain struct {
@@ -31,24 +30,18 @@ func (c *Chain) MinePendingTransactions() {
 	c.PendingTransactions = make(Transactions, 0)
 }
 
-func (c *Chain) AddTransaction(sender wallet.Wallet, receiver string, amount int64) {
-	transaction := NewSignedTransaction(TransactionOptions{
-		Sender:       sender,
-		ReceiverAddr: receiver,
-		Amount:       amount,
-	})
-
-	has, err := transaction.HasValidSignature()
+func (c *Chain) AddTransaction(tx *Transaction) error {
+	has, err := tx.HasValidSignature()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	if !has {
-		fmt.Printf("invalid signature (%s) for transaction (%s)\n", transaction.Signature, transaction.CalculateHash())
-		return
+		return errors.New(fmt.Sprintf("invalid signature (%s) for transaction (%s)\n", tx.Signature, tx.CalculateHash()))
 	}
 
-	c.PendingTransactions = append(c.PendingTransactions, *transaction)
+	c.PendingTransactions = append(c.PendingTransactions, *tx)
+	return nil
 }
 
 type ChainOptions struct {

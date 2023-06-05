@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/guiferpa/jackchain/blockchain"
 	"github.com/guiferpa/jackchain/net"
 	"github.com/spf13/cobra"
 )
@@ -30,8 +31,9 @@ func init() {
 			}
 
 			addr := args[0]
+			chain := blockchain.NewChain(blockchain.ChainOptions{})
 
-			node, err := net.NewNode(addr)
+			node, err := net.NewNode(addr, chain)
 			if err != nil {
 				panic(err)
 			}

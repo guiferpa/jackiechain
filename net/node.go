@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"strings"
+
+	"github.com/guiferpa/jackchain/blockchain"
 )
 
 var PROTOCOL = "tcp"
@@ -13,6 +16,7 @@ var PROTOCOL = "tcp"
 type Node struct {
 	Addr        string
 	FingerTable map[string]Finger
+	Chain       *blockchain.Chain
 }
 
 func (n *Node) Listen(doneCh chan bool, errCh chan error) {
@@ -41,10 +45,29 @@ func (n *Node) Listen(doneCh chan bool, errCh chan error) {
 			return
 		}
 
-		message := strings.Fields(string(buf))
+		message := strings.Split(string(buf), " ")
 
-		if message[0] == "OK" {
-			switch message[1] {
+		if status := message[0]; status == "OK" {
+			switch op := message[1]; op {
+			case "TX":
+				fmt.Println(message)
+
+				amount, err := strconv.ParseInt(message[4], 10, 64)
+				if err != nil {
+					errCh <- err
+				}
+
+				tx := &blockchain.Transaction{
+					Sender:    message[2],
+					Receiver:  message[3],
+					Amount:    amount,
+					Signature: []byte(message[5]),
+				}
+
+				if err := n.Chain.AddTransaction(tx); err != nil {
+					errCh <- err
+				}
+
 			case "CONNECT":
 				id := message[3]
 				if _, ok := n.FingerTable[id]; !ok {
@@ -120,9 +143,10 @@ func (n *Node) Disconnect(addr string) error {
 	return nil
 }
 
-func NewNode(addr string) (*Node, error) {
+func NewNode(addr string, chain *blockchain.Chain) (*Node, error) {
 	return &Node{
 		Addr:        addr,
+		Chain:       chain,
 		FingerTable: make(map[string]Finger, 0),
 	}, nil
 }

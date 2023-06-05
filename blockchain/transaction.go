@@ -32,7 +32,7 @@ func (ts Transactions) String() string {
 }
 
 type Transaction struct {
-	Signature string `json:"signature"`
+	Signature []byte `json:"signature"`
 	Sender    string `json:"sender"`
 	Receiver  string `json:"receiver"`
 	Amount    int64  `json:"amount"`
@@ -50,7 +50,7 @@ func (t *Transaction) Sign(privKey ed25519.PrivateKey) {
 	s := sha256.New()
 	s.Write([]byte(h))
 	signature := ed25519.Sign(privKey, []byte(h))
-	t.Signature = hex.EncodeToString(signature)
+	t.Signature = signature
 }
 
 func (t *Transaction) HasValidSignature() (bool, error) {
@@ -60,12 +60,8 @@ func (t *Transaction) HasValidSignature() (bool, error) {
 	}
 
 	h := t.CalculateHash()
-	sig, err := hex.DecodeString(t.Signature)
-	if err != nil {
-		return false, err
-	}
 
-	return ed25519.Verify(b, []byte(h), sig), nil
+	return ed25519.Verify(b, []byte(h), t.Signature[:ed25519.SignatureSize]), nil
 }
 
 type TransactionOptions struct {

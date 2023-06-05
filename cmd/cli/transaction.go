@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"net"
+	"strconv"
 
+	"github.com/guiferpa/jackchain/blockchain"
 	"github.com/guiferpa/jackchain/wallet"
 	"github.com/spf13/cobra"
 )
@@ -19,40 +23,41 @@ type CreateTransactionHTTPRequestBody struct {
 
 func init() {
 	txCmd = &cobra.Command{
-		Use:   "tx",
+		Use:   "tx [to] [amount] [node]",
 		Short: "Create assigned transaction",
-		Args:  cobra.ExactArgs(0),
+		Args:  cobra.ExactArgs(3),
 		Run: func(cmd *cobra.Command, args []string) {
 			w, err := wallet.ParseWallet()
 			if err != nil {
 				panic(err)
 			}
 
-			fmt.Println(w.GetAddress())
+			amount, err := strconv.ParseInt(args[1], 10, 64)
+			if err != nil {
+				panic(err)
+			}
 
-			/*
-				from := args[0]
-				to := args[1]
-				amount := args[2]
-				key := args[3]
-				pamount, err := strconv.ParseInt(amount, 64)
-				if err != nil {
-					panic(err)
-				}
+			tx := blockchain.NewSignedTransaction(blockchain.TransactionOptions{
+				Sender:       *w,
+				ReceiverAddr: args[0],
+				Amount:       amount,
+			})
 
-				blockchain.NewSignedTransaction(blockchain.TransactionOptions{
+			fmt.Println(tx.Signature)
+			message := fmt.Sprintf("OK TX %s %s %d %s", tx.Sender, tx.Receiver, tx.Amount, tx.Signature)
 
-				})
+			node := args[2]
+			conn, err := net.Dial("tcp", node)
+			if err != nil {
+				panic(err)
+			}
 
-				body := CreateTransactionHTTPRequestBody{
-					From:   from,
-					To:     to,
-					Amount: pamount,
-				}
+			b := bytes.NewBufferString(message)
+			if _, err := conn.Write(b.Bytes()); err != nil {
+				panic(err)
+			}
 
-				port := args[4]
-				req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:%s/transactions/sign"))
-			*/
+			fmt.Println("Transaction", tx.CalculateHash(), "sent")
 		},
 	}
 }
