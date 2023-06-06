@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -52,34 +53,42 @@ type commanderOptions struct {
 	Args     []string
 }
 
-func commander(opts commanderOptions, node *inet.Node, msgc chan string, errc chan error) {
+func commander(opts commanderOptions, node *inet.Node) error {
+	if strings.ToLower(opts.Action) == "get" {
+		switch strings.ToLower(opts.Resource) {
+		case "chain":
+			bs, err := json.MarshalIndent(node.Chain, "", "   ")
+			if err != nil {
+				return err
+			}
+
+			fmt.Println("Chain:", string(bs))
+		}
+	}
+
 	if strings.ToLower(opts.Action) == "create" {
 		switch strings.ToLower(opts.Resource) {
 		case "wallet":
 			w, err := wallet.NewWallet()
 			if err != nil {
-				errc <- err
-				break
+				return err
 			}
 
 			if err = w.ExportPrivateKey(); err != nil {
-				errc <- err
-				break
+				return err
 			}
 
-			msgc <- fmt.Sprintln("Wallet address:", w.GetAddress())
+			fmt.Println("Wallet address:", w.GetAddress())
 
 		case "tx":
 			w, err := wallet.ParseWallet()
 			if err != nil {
-				errc <- err
-				break
+				return err
 			}
 
 			amount, err := strconv.ParseInt(opts.Args[1], 10, 64)
 			if err != nil {
-				errc <- err
-				break
+				return err
 			}
 
 			tx := bc.NewSignedTransaction(bc.TransactionOptions{
@@ -88,17 +97,25 @@ func commander(opts commanderOptions, node *inet.Node, msgc chan string, errc ch
 				Amount:       amount,
 			})
 			if err := node.Chain.AddTransaction(tx); err != nil {
-				errc <- err
-				break
+				return err
 			}
 
-			msgc <- fmt.Sprintln("Transaction", tx.CalculateHash(), "created")
+			fmt.Println("Transaction:", tx.CalculateHash(), "sent")
+
+			if len(node.Chain.PendingTransactions) == 3 {
+				fmt.Println("Block: Mining next block...")
+				h := node.Chain.MinePendingTransactions(w.GetAddress())
+				fmt.Println("Block: Mined hash", h)
+			}
+
+			return nil
 
 		default:
-			errc <- errors.New(fmt.Sprintf("Resource %s not found", opts.Resource))
+			return errors.New(fmt.Sprintf("Resource %s not found", opts.Resource))
 		}
-
 	}
+
+	return nil
 }
 
 func main() {
@@ -111,7 +128,11 @@ func main() {
 		panic(err)
 	}
 
-	chain := bc.NewChain(bc.ChainOptions{})
+	chain := bc.NewChain(bc.ChainOptions{
+		MiningDifficulty:    2,
+		MiningReward:        1,
+		PendingTransactions: make(bc.Transactions, 0),
+	})
 	node := inet.NewNode(address, chain)
 
 	log.Println("Node's running at", fmt.Sprintf("%s/%s", network, address))
@@ -129,7 +150,7 @@ func main() {
 			log.Println(err)
 
 		case msg := <-msgc:
-			fmt.Print("Message:", string(msg))
+			fmt.Print(msg)
 
 		case cmd := <-cmdc:
 			cmd = strings.Trim(cmd, string('\n'))
@@ -151,7 +172,9 @@ func main() {
 				Args:     l[2:],
 			}
 
-			go commander(opts, node, msgc, errc)
+			if err := commander(opts, node); err != nil {
+				fmt.Println(err)
+			}
 		}
 	}
 }

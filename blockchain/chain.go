@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/guiferpa/jackchain/wallet"
 )
 
 type Chain struct {
@@ -13,7 +15,7 @@ type Chain struct {
 	MiningReward        int          `json:"mining_reward"`
 }
 
-func (c *Chain) MinePendingTransactions() {
+func (c *Chain) MinePendingTransactions(minerAddr string) string {
 	block := NewBlock(c.PendingTransactions)
 
 	got := strings.Repeat("0", c.MiningDifficulty)
@@ -25,9 +27,20 @@ func (c *Chain) MinePendingTransactions() {
 		block.CalculateHash()
 	}
 
+	if len(c.Blocks) > 0 {
+		block.PreviousHash = c.Blocks[len(c.Blocks)-1].Hash
+	}
+
 	c.Blocks = append(c.Blocks, *block)
 
-	c.PendingTransactions = make(Transactions, 0)
+	rewardTx := NewTransaction(TransactionOptions{
+		Sender:       wallet.Wallet{},
+		ReceiverAddr: minerAddr,
+		Amount:       int64(c.MiningReward),
+	})
+	c.PendingTransactions = Transactions{*rewardTx}
+
+	return block.Hash
 }
 
 func (c *Chain) AddTransaction(tx *Transaction) error {
@@ -40,7 +53,9 @@ func (c *Chain) AddTransaction(tx *Transaction) error {
 		return errors.New(fmt.Sprintf("invalid signature (%s) for transaction (%s)\n", tx.Signature, tx.CalculateHash()))
 	}
 
-	c.PendingTransactions = append(c.PendingTransactions, *tx)
+	pt := c.PendingTransactions
+	c.PendingTransactions = append(pt, *tx)
+
 	return nil
 }
 
