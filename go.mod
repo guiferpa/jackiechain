@@ -1,4 +1,4 @@
-module github.com/guiferpa/jackchain
+module github.com/guiferpa/jackiechain
 
 go 1.19
 

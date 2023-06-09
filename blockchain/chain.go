@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/guiferpa/jackchain/wallet"
+	"github.com/guiferpa/jackiechain/wallet"
 )
 
 type Chain struct {

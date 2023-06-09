@@ -14,7 +14,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/google/uuid"
 
-	"github.com/guiferpa/jackchain/blockchain"
+	"github.com/guiferpa/jackiechain/blockchain"
 )
 
 var mu sync.Mutex

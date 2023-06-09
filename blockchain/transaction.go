@@ -8,8 +8,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/guiferpa/jackchain/wallet"
 	"github.com/mr-tron/base58"
+
+	"github.com/guiferpa/jackiechain/wallet"
 )
 
 type Sender struct {

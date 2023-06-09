@@ -9,8 +9,8 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/guiferpa/jackchain/blockchain"
-	"github.com/guiferpa/jackchain/p2p"
+	"github.com/guiferpa/jackiechain/blockchain"
+	"github.com/guiferpa/jackiechain/p2p"
 )
 
 var (
