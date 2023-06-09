@@ -1,17 +1,17 @@
-package p2p
+package tcp
 
 import (
 	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"strings"
 	"sync"
+	"time"
 
-	"github.com/fatih/color"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
 	"github.com/guiferpa/jackiechain/blockchain"
@@ -19,33 +19,29 @@ import (
 
 var mu sync.Mutex
 
-type NodeHandler func(message []string) error
+type NodeHandler func(net.Conn) error
 
 type NodeTerminateHandler func(os.Signal) (int, error)
 
 type Node struct {
 	ID               string
-	Port             string
+	UpAt             time.Time
 	peers            map[string]string
 	chain            *blockchain.Chain
-	handlers         map[string]NodeHandler
+	handler          NodeHandler
+	httpRouter       chi.Router
 	terminateHandler NodeTerminateHandler
+	Config           NodeConfig
 }
 
-func read(ln net.Listener, msgc chan []byte) error {
+func read(ln net.Listener, h NodeHandler) error {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
 			return err
 		}
-		defer conn.Close()
 
-		bs := make([]byte, 1024)
-		if _, err := conn.Read(bs); err != nil {
-			return err
-		}
-
-		msgc <- bs
+		go h(conn)
 	}
 }
 
@@ -77,7 +73,7 @@ func send(addr string, msg []byte) error {
 
 func (n *Node) Broadcast(msg []byte) error {
 	for _, peer := range n.peers {
-		if err := send(peer, msg); err != nil {
+		if err := send(peer, []byte(fmt.Sprintf("JACKIE %s %s", JACKIE_MESSAGE, string(msg)))); err != nil {
 			return err
 		}
 	}
@@ -86,14 +82,14 @@ func (n *Node) Broadcast(msg []byte) error {
 }
 
 func (n *Node) ShareConnectionState(host, port string) error {
-	message := []byte(fmt.Sprintf("%s %s %s %s", CONNECT, n.ID, "0.0.0.0", n.Port))
+	message := []byte(fmt.Sprintf("JACKIE %s %s 0.0.0.0 %s", JACKIE_CONNECT, n.ID, n.Config.NodePort))
 	if err := send(fmt.Sprintf("0.0.0.0:%s", port), message); err != nil {
 		return err
 	}
 
 	for key, peer := range n.peers {
 		pport := strings.Split(peer, ":")[1]
-		message = []byte(fmt.Sprintf("%s %s %s %s", CONNECT, key, "0.0.0.0", pport))
+		message = []byte(fmt.Sprintf("JACKIE %s %s 0.0.0.0 %s", JACKIE_CONNECT, key, pport))
 		if err := send(fmt.Sprintf("0.0.0.0:%s", port), message); err != nil {
 			return err
 		}
@@ -103,12 +99,12 @@ func (n *Node) ShareConnectionState(host, port string) error {
 }
 
 func (n *Node) Connect(host, port string) error {
-	message := []byte(fmt.Sprintf("%s %s %s %s", CONNECT, n.ID, "0.0.0.0", n.Port))
+	message := []byte(fmt.Sprintf("JACKIE %s %s 0.0.0.0 %s", JACKIE_CONNECT, n.ID, n.Config.NodePort))
 	return send(fmt.Sprintf("%s:%s", host, port), message)
 }
 
 func (n *Node) DisconnectPeers() error {
-	message := []byte(fmt.Sprintf("%s %s", DISCONNECT, n.ID))
+	message := []byte(fmt.Sprintf("JACKIE %s %s", JACKIE_DISCONNECT, n.ID))
 	if err := n.Broadcast(message); err != nil {
 		return err
 	}
@@ -148,25 +144,11 @@ func (n *Node) RemovePeer(id string) error {
 	return nil
 }
 
-func (n *Node) SetHandler(t string, h NodeHandler) {
+func (n *Node) SetHandler(h NodeHandler) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	n.handlers[t] = h
-}
-
-func (n *Node) SetGenericHandler(h NodeHandler) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	n.handlers["generic"] = h
-}
-
-func (n *Node) SetWriteHandler(h NodeHandler) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	n.handlers["write"] = h
+	n.handler = h
 }
 
 func (n *Node) SetTerminateHandler(h NodeTerminateHandler) {
@@ -176,43 +158,22 @@ func (n *Node) SetTerminateHandler(h NodeTerminateHandler) {
 	n.terminateHandler = h
 }
 
-func (n *Node) Listen(port string, verbose bool, sigc chan os.Signal) error {
-	n.Port = port
-
-	addr := fmt.Sprintf("0.0.0.0:%s", n.Port)
+func (n *Node) Listen(sigc chan os.Signal) error {
+	addr := fmt.Sprintf("0.0.0.0:%s", n.Config.NodePort)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
 
-	msgc := make(chan []byte)
+	connc := make(chan net.Conn)
 	brdc := make(chan []byte)
 
-	go read(ln, msgc)
+	go read(ln, n.handler)
 	go write(n.ID, brdc)
 
-	go func(msgc, brdc chan []byte) {
+	go func(connc chan net.Conn, brdc chan []byte) {
 		for {
 			select {
-			case msg := <-msgc:
-				if verbose {
-					yellow := color.New(color.FgYellow).SprintFunc()
-					log.Println(yellow(string(msg)))
-				}
-
-				line := strings.Fields(string(msg))
-
-				mu.Lock()
-				handler, exists := n.handlers[line[0]]
-				if !exists {
-					handler = n.handlers["generic"]
-				}
-				mu.Unlock()
-
-				if err := handler(line); err != nil {
-					panic(err)
-				}
-
 			case brd := <-brdc:
 				if err := n.Broadcast(brd); err != nil {
 					panic(err)
@@ -230,16 +191,25 @@ func (n *Node) Listen(port string, verbose bool, sigc chan os.Signal) error {
 				os.Exit(code)
 			}
 		}
-	}(msgc, brdc)
+	}(connc, brdc)
 
 	return nil
 }
 
-func NewNode(chain *blockchain.Chain) *Node {
+type NodeConfig struct {
+	NodePort string
+	Verbose  bool
+}
+
+func NewNode(config NodeConfig, chain *blockchain.Chain) *Node {
+	httpRouter := chi.NewRouter()
+
 	return &Node{
-		ID:       uuid.NewString(),
-		chain:    chain,
-		peers:    make(map[string]string, 0),
-		handlers: make(map[string]NodeHandler, 0),
+		ID:         uuid.NewString(),
+		UpAt:       time.Now(),
+		chain:      chain,
+		httpRouter: httpRouter,
+		peers:      make(map[string]string, 0),
+		Config:     config,
 	}
 }
