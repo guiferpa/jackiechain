@@ -2,24 +2,34 @@ package p2p
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
 	"sync"
 
+	"github.com/fatih/color"
 	"github.com/google/uuid"
+
 	"github.com/guiferpa/jackchain/blockchain"
 )
 
 var mu sync.Mutex
 
+type NodeHandler func(message []string) error
+
+type NodeTerminateHandler func(os.Signal) (int, error)
+
 type Node struct {
-	ID    string
-	Port  string
-	peers map[string]string
-	chain *blockchain.Chain
+	ID               string
+	Port             string
+	peers            map[string]string
+	chain            *blockchain.Chain
+	handlers         map[string]NodeHandler
+	terminateHandler NodeTerminateHandler
 }
 
 func read(ln net.Listener, msgc chan []byte) error {
@@ -97,7 +107,7 @@ func (n *Node) Connect(host, port string) error {
 	return send(fmt.Sprintf("%s:%s", host, port), message)
 }
 
-func (n *Node) DisconnectFromPeers() error {
+func (n *Node) DisconnectPeers() error {
 	message := []byte(fmt.Sprintf("%s %s", DISCONNECT, n.ID))
 	if err := n.Broadcast(message); err != nil {
 		return err
@@ -107,6 +117,9 @@ func (n *Node) DisconnectFromPeers() error {
 }
 
 func (n *Node) AddPeer(id, host, port string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
 	if id == n.ID {
 		return errors.New("it's not possible add itself")
 	}
@@ -121,6 +134,11 @@ func (n *Node) AddPeer(id, host, port string) error {
 }
 
 func (n *Node) RemovePeer(id string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	id = string(bytes.Trim([]byte(id), "\x00"))
+
 	if _, ok := n.peers[id]; !ok {
 		return errors.New("peer already removed")
 	}
@@ -130,19 +148,41 @@ func (n *Node) RemovePeer(id string) error {
 	return nil
 }
 
-type NodeHandler func(message, broadcast string) error
+func (n *Node) SetHandler(t string, h NodeHandler) {
+	mu.Lock()
+	defer mu.Unlock()
 
-func (n *Node) SetHandler(t string, h NodeHandler) {}
+	n.handlers[t] = h
+}
 
-func (n *Node) SetGenericHandler(h NodeHandler) {}
+func (n *Node) SetGenericHandler(h NodeHandler) {
+	mu.Lock()
+	defer mu.Unlock()
 
-func (n *Node) Listen(port string) (<-chan []byte, <-chan []byte, error) {
+	n.handlers["generic"] = h
+}
+
+func (n *Node) SetWriteHandler(h NodeHandler) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	n.handlers["write"] = h
+}
+
+func (n *Node) SetTerminateHandler(h NodeTerminateHandler) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	n.terminateHandler = h
+}
+
+func (n *Node) Listen(port string, verbose bool, sigc chan os.Signal) error {
 	n.Port = port
 
 	addr := fmt.Sprintf("0.0.0.0:%s", n.Port)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	msgc := make(chan []byte)
@@ -151,9 +191,55 @@ func (n *Node) Listen(port string) (<-chan []byte, <-chan []byte, error) {
 	go read(ln, msgc)
 	go write(n.ID, brdc)
 
-	return msgc, brdc, nil
+	go func(msgc, brdc chan []byte) {
+		for {
+			select {
+			case msg := <-msgc:
+				if verbose {
+					yellow := color.New(color.FgYellow).SprintFunc()
+					log.Println(yellow(string(msg)))
+				}
+
+				line := strings.Fields(string(msg))
+
+				mu.Lock()
+				handler, exists := n.handlers[line[0]]
+				if !exists {
+					handler = n.handlers["generic"]
+				}
+				mu.Unlock()
+
+				if err := handler(line); err != nil {
+					panic(err)
+				}
+
+			case brd := <-brdc:
+				if err := n.Broadcast(brd); err != nil {
+					panic(err)
+				}
+
+			case sig := <-sigc:
+				mu.Lock()
+				code, err := n.terminateHandler(sig)
+				mu.Unlock()
+
+				if err != nil {
+					fmt.Println(err)
+				}
+
+				os.Exit(code)
+			}
+		}
+	}(msgc, brdc)
+
+	return nil
 }
 
 func NewNode(chain *blockchain.Chain) *Node {
-	return &Node{ID: uuid.NewString(), chain: chain, peers: make(map[string]string, 0)}
+	return &Node{
+		ID:       uuid.NewString(),
+		chain:    chain,
+		peers:    make(map[string]string, 0),
+		handlers: make(map[string]NodeHandler, 0),
+	}
 }
