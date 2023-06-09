@@ -1,180 +1,128 @@
 package main
 
 import (
-	"bufio"
-	"encoding/json"
-	"errors"
-	"fmt"
+	"flag"
 	"log"
-	"net"
 	"os"
-	"strconv"
+	"os/signal"
 	"strings"
+	"sync"
+	"syscall"
 
-	bc "github.com/guiferpa/jackchain/blockchain"
-	inet "github.com/guiferpa/jackchain/net"
-	"github.com/guiferpa/jackchain/wallet"
+	"github.com/fatih/color"
+
+	"github.com/guiferpa/jackchain/blockchain"
+	"github.com/guiferpa/jackchain/p2p"
 )
 
-func read(ln net.Listener, msgc chan string, errc chan error) {
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			errc <- err
-			continue
-		}
+var (
+	peer    string
+	port    string
+	verbose bool
+)
 
-		bs := make([]byte, 1024)
-		if _, err := conn.Read(bs); err != nil {
-			errc <- err
-			continue
-		}
-
-		msgc <- string(bs)
-	}
+func init() {
+	flag.StringVar(&peer, "peer", "", "set peer")
+	flag.StringVar(&port, "port", "3000", "set port")
+	flag.BoolVar(&verbose, "verbose", false, "set verbose")
 }
 
-func write(cmdc chan string, errc chan error) {
-	reader := bufio.NewReader(os.Stdin)
-
-	for {
-		s, err := reader.ReadString('\n')
-		if err != nil {
-			errc <- err
-		}
-
-		cmdc <- s
-	}
-}
-
-type commanderOptions struct {
-	Action   string
-	Resource string
-	Args     []string
-}
-
-func commander(opts commanderOptions, node *inet.Node) error {
-	if strings.ToLower(opts.Action) == "get" {
-		switch strings.ToLower(opts.Resource) {
-		case "chain":
-			bs, err := json.MarshalIndent(node.Chain, "", "   ")
-			if err != nil {
-				return err
-			}
-
-			fmt.Println("Chain:", string(bs))
-		}
-	}
-
-	if strings.ToLower(opts.Action) == "create" {
-		switch strings.ToLower(opts.Resource) {
-		case "wallet":
-			w, err := wallet.NewWallet()
-			if err != nil {
-				return err
-			}
-
-			if err = w.ExportPrivateKey(); err != nil {
-				return err
-			}
-
-			fmt.Println("Wallet address:", w.GetAddress())
-
-		case "tx":
-			w, err := wallet.ParseWallet()
-			if err != nil {
-				return err
-			}
-
-			amount, err := strconv.ParseInt(opts.Args[1], 10, 64)
-			if err != nil {
-				return err
-			}
-
-			tx := bc.NewSignedTransaction(bc.TransactionOptions{
-				Sender:       *w,
-				ReceiverAddr: opts.Args[0],
-				Amount:       amount,
-			})
-			if err := node.Chain.AddTransaction(tx); err != nil {
-				return err
-			}
-
-			fmt.Println("Transaction:", tx.CalculateHash(), "sent")
-
-			if len(node.Chain.PendingTransactions) == 3 {
-				fmt.Println("Block: Mining next block...")
-				h := node.Chain.MinePendingTransactions(w.GetAddress())
-				fmt.Println("Block: Mined hash", h)
-			}
-
-			return nil
-
-		default:
-			return errors.New(fmt.Sprintf("Resource %s not found", opts.Resource))
-		}
-	}
-
-	return nil
-}
+var mu sync.Mutex
 
 func main() {
-	network := "tcp"
-	port := "3000"
-	address := fmt.Sprintf("0.0.0.0:%s", port)
+	flag.Parse()
 
-	ln, err := net.Listen(network, address)
+	chain := blockchain.NewChain(blockchain.ChainOptions{})
+	node := p2p.NewNode(chain)
+
+	msgc, brdc, err := node.Listen(port)
 	if err != nil {
 		panic(err)
 	}
 
-	chain := bc.NewChain(bc.ChainOptions{
-		MiningDifficulty:    2,
-		MiningReward:        1,
-		PendingTransactions: make(bc.Transactions, 0),
+	if peer != "" {
+		if err := node.Connect("0.0.0.0", peer); err != nil {
+			panic(err)
+		}
+	}
+
+	log.Println("Node", node.ID, "is running at", node.Port)
+
+	node.SetHandler(p2p.CONNECT, func(message, broadcast string) error {
+		return nil
 	})
-	node := inet.NewNode(address, chain)
 
-	log.Println("Node's running at", fmt.Sprintf("%s/%s", network, address))
+	node.SetHandler(p2p.DISCONNECT, func(message, broadcast string) error {
+		return nil
+	})
 
-	cmdc := make(chan string, 0)
-	msgc := make(chan string, 0)
-	errc := make(chan error, 0)
-
-	go read(ln, msgc, errc)
-	go write(cmdc, errc)
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 
 	for {
 		select {
-		case err := <-errc:
-			log.Println(err)
-
 		case msg := <-msgc:
-			fmt.Print(msg)
-
-		case cmd := <-cmdc:
-			cmd = strings.Trim(cmd, string('\n'))
-
-			if cmd == "" {
-				continue
+			if verbose {
+				yellow := color.New(color.FgYellow).SprintFunc()
+				log.Println(yellow(string(msg)))
 			}
 
-			l := strings.Fields(cmd)
+			line := strings.Fields(string(msg))
 
-			if len(l) < 2 {
-				fmt.Println("Command", cmd, "is wrong")
-				continue
+			switch line[0] {
+			case p2p.CONNECT:
+				mu.Lock()
+
+				err := node.AddPeer(line[1], line[2], line[3])
+
+				mu.Unlock()
+
+				if err != nil {
+					if err.Error() == "peer already added" {
+						continue
+					}
+
+					if err.Error() == "it's not possible add itself" {
+						continue
+					}
+
+					panic(err)
+				}
+
+				log.Println("Connected to", line[1])
+
+				if err := node.ShareConnectionState(line[2], line[3]); err != nil {
+					panic(err)
+				}
+
+			case p2p.DISCONNECT:
+				mu.Lock()
+
+				err := node.RemovePeer(line[1])
+
+				mu.Unlock()
+
+				if err != nil {
+					panic(err)
+				}
+
+				log.Println("Disconnected to", line[1])
+
+			default:
+				log.Printf(string(msg))
 			}
 
-			opts := commanderOptions{
-				Action:   l[0],
-				Resource: l[1],
-				Args:     l[2:],
+		case brd := <-brdc:
+			if err := node.Broadcast(brd); err != nil {
+				panic(err)
 			}
 
-			if err := commander(opts, node); err != nil {
-				fmt.Println(err)
+		case <-sigc:
+			if err := node.DisconnectFromPeers(); err != nil {
+				panic(err)
 			}
+			log.Println("Node", node.ID, "is terminated")
+			os.Exit(0)
 		}
 	}
 }

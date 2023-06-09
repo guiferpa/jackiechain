@@ -1,12 +1,10 @@
 package net
 
-import "github.com/guiferpa/jackchain/blockchain"
+const NODE_PROTOCOL = "tcp"
 
 type Node struct {
-	Addr  string
-	Chain *blockchain.Chain
 }
 
-func NewNode(addr string, chain *blockchain.Chain) *Node {
-	return &Node{Addr: addr, Chain: chain}
+func NewNode() error {
+	return nil
 }
