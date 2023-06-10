@@ -73,7 +73,7 @@ func send(addr string, msg []byte) error {
 
 func (n *Node) Broadcast(msg []byte) error {
 	for _, peer := range n.peers {
-		if err := send(peer, []byte(fmt.Sprintf("JACKIE %s %s", JACKIE_MESSAGE, string(msg)))); err != nil {
+		if err := send(peer, msg); err != nil {
 			return err
 		}
 	}
@@ -82,6 +82,9 @@ func (n *Node) Broadcast(msg []byte) error {
 }
 
 func (n *Node) ShareConnectionState(host, port string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
 	message := []byte(fmt.Sprintf("JACKIE %s %s 0.0.0.0 %s", JACKIE_CONNECT, n.ID, n.Config.NodePort))
 	if err := send(fmt.Sprintf("0.0.0.0:%s", port), message); err != nil {
 		return err
@@ -175,7 +178,7 @@ func (n *Node) Listen(sigc chan os.Signal) error {
 		for {
 			select {
 			case brd := <-brdc:
-				if err := n.Broadcast(brd); err != nil {
+				if err := n.Broadcast([]byte(fmt.Sprintf("JACKIE %s %s", JACKIE_MESSAGE, string(brd)))); err != nil {
 					panic(err)
 				}
 
