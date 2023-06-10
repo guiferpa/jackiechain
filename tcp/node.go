@@ -225,7 +225,7 @@ func (n *Node) Stats() NodeStats {
 	for id, peer := range n.peers {
 		peers = append(peers, map[string]string{
 			"id":      id,
-			"address": peer,
+			"address": strings.Trim(peer, "\x00"),
 		})
 	}
 

@@ -16,6 +16,7 @@ import (
 	"github.com/guiferpa/jackiechain/blockchain"
 	"github.com/guiferpa/jackiechain/httputil"
 	"github.com/guiferpa/jackiechain/tcp"
+	"github.com/guiferpa/jackiechain/wallet"
 )
 
 var (
@@ -106,10 +107,66 @@ func main() {
 						return err
 					}
 					return httputil.Response(req, conn, http.StatusOK, buf)
+
+					/***
+					TODO: Created router to route these resources
+					In this GET - /wallets I'd like to receive
+					private seed as url params instead of query params
+
+					Start: https://dev.to/bmf_san/introduction-to-golang-http-router-made-with-nethttp-3nmb
+					**/
+
+				case "/wallets":
+					seed := req.URL.Query().Get("seed")
+
+					if seed == "" {
+						return httputil.ResponseNotFound(req, conn)
+					}
+
+					w, err := wallet.ParseWallet(seed)
+					if err != nil {
+						return err
+					}
+
+					payload := map[string]interface{}{
+						"address":      w.GetAddress(),
+						"private_seed": w.GetPrivateSeed(),
+					}
+
+					buf := &bytes.Buffer{}
+					if err := json.NewEncoder(buf).Encode(payload); err != nil {
+						return err
+					}
+					return httputil.Response(req, conn, http.StatusOK, buf)
+
+				default:
+					return httputil.ResponseNotFound(req, conn)
 				}
 			}
 
-			return httputil.ResponseNotFound(req, conn)
+			if req.Method == http.MethodPost {
+				switch req.URL.Path {
+				case "/wallets":
+					w, err := wallet.NewWallet()
+					if err != nil {
+						return err
+					}
+
+					payload := map[string]interface{}{
+						"address":      w.GetAddress(),
+						"private_seed": w.GetPrivateSeed(),
+					}
+
+					buf := &bytes.Buffer{}
+					if err := json.NewEncoder(buf).Encode(payload); err != nil {
+						return err
+					}
+					return httputil.Response(req, conn, http.StatusCreated, buf)
+
+				default:
+					return httputil.ResponseNotFound(req, conn)
+				}
+			}
 		}
 
 		return nil
