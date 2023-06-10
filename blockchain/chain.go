@@ -66,10 +66,16 @@ type ChainOptions struct {
 }
 
 func NewChain(opts ChainOptions) *Chain {
+	pendingTransactions := opts.PendingTransactions
+
+	if pendingTransactions == nil {
+		pendingTransactions = make(Transactions, 0)
+	}
+
 	return &Chain{
 		MiningDifficulty:    opts.MiningDifficulty,
 		MiningReward:        opts.MiningReward,
-		PendingTransactions: opts.PendingTransactions,
+		PendingTransactions: pendingTransactions,
 		Blocks:              make([]Block, 0),
 	}
 }

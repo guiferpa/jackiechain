@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"flag"
 	"log"
 	"net"
@@ -43,7 +45,12 @@ func main() {
 	node.SetHandler(func(conn net.Conn) error {
 		defer conn.Close()
 
-		if act, args, err := tcp.ParseJackieRequest(conn); err == nil {
+		bs := make([]byte, 1024)
+		if _, err := conn.Read(bs); err != nil {
+			return err
+		}
+
+		if act, args, err := tcp.ParseJackieRequest(bytes.NewBuffer(bs)); err == nil {
 			switch act {
 			case tcp.JACKIE_CONNECT:
 				if err := node.AddPeer(args[0], args[1], args[2]); err != nil {
@@ -79,16 +86,30 @@ func main() {
 				log.Print(strings.Join(args, " "))
 			}
 		} else {
-			req, err := tcp.ParseHTTPRequest(conn)
+			req, err := tcp.ParseHTTPRequest(bytes.NewBuffer(bs))
 			if err != nil {
 				return err
 			}
 
-			resp := httputil.NewHTTPResponse(req, http.StatusOK, []byte(req.Method))
+			if req.Method == http.MethodGet {
+				switch req.URL.Path {
+				case "/chain":
+					buf := &bytes.Buffer{}
+					if err := json.NewEncoder(buf).Encode(node.Chain); err != nil {
+						return err
+					}
+					return httputil.Response(req, conn, http.StatusOK, buf)
 
-			_, err = httputil.Response(conn, resp)
+				case "/stats":
+					buf := &bytes.Buffer{}
+					if err := json.NewEncoder(buf).Encode(node.Stats()); err != nil {
+						return err
+					}
+					return httputil.Response(req, conn, http.StatusOK, buf)
+				}
+			}
 
-			return err
+			return httputil.ResponseNotFound(req, conn)
 		}
 
 		return nil
@@ -120,5 +141,5 @@ func main() {
 		}
 	}
 
-	select {}
+	<-sigc
 }

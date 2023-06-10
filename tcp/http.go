@@ -2,10 +2,10 @@ package tcp
 
 import (
 	"bufio"
-	"net"
+	"bytes"
 	"net/http"
 )
 
-func ParseHTTPRequest(conn net.Conn) (*http.Request, error) {
-	return http.ReadRequest(bufio.NewReader(conn))
+func ParseHTTPRequest(b *bytes.Buffer) (*http.Request, error) {
+	return http.ReadRequest(bufio.NewReader(b))
 }

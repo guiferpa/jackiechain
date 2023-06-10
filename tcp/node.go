@@ -27,11 +27,18 @@ type Node struct {
 	ID               string
 	UpAt             time.Time
 	peers            map[string]string
-	chain            *blockchain.Chain
+	Chain            *blockchain.Chain
 	handler          NodeHandler
 	httpRouter       chi.Router
 	terminateHandler NodeTerminateHandler
 	Config           NodeConfig
+}
+
+type NodeStats struct {
+	ID       string        `json:"id"`
+	Uptime   time.Duration `json:"uptime"`
+	Peers    []interface{} `json:"peers"`
+	NodePort string        `json:"node_port"`
 }
 
 func read(ln net.Listener, h NodeHandler) error {
@@ -41,7 +48,7 @@ func read(ln net.Listener, h NodeHandler) error {
 			return err
 		}
 
-		go h(conn)
+		h(conn)
 	}
 }
 
@@ -72,6 +79,9 @@ func send(addr string, msg []byte) error {
 }
 
 func (n *Node) Broadcast(msg []byte) error {
+	mu.Lock()
+	defer mu.Unlock()
+
 	for _, peer := range n.peers {
 		if err := send(peer, msg); err != nil {
 			return err
@@ -171,7 +181,12 @@ func (n *Node) Listen(sigc chan os.Signal) error {
 	connc := make(chan net.Conn)
 	brdc := make(chan []byte)
 
-	go read(ln, n.handler)
+	mu.Lock()
+	handler := n.handler
+	mu.Unlock()
+
+	go read(ln, handler)
+
 	go write(n.ID, brdc)
 
 	go func(connc chan net.Conn, brdc chan []byte) {
@@ -184,9 +199,10 @@ func (n *Node) Listen(sigc chan os.Signal) error {
 
 			case sig := <-sigc:
 				mu.Lock()
-				code, err := n.terminateHandler(sig)
+				handler := n.terminateHandler
 				mu.Unlock()
 
+				code, err := handler(sig)
 				if err != nil {
 					fmt.Println(err)
 				}
@@ -197,6 +213,30 @@ func (n *Node) Listen(sigc chan os.Signal) error {
 	}(connc, brdc)
 
 	return nil
+}
+
+func (n *Node) Stats() NodeStats {
+	peers := make([]interface{}, 0)
+
+	mu.Lock()
+
+	uptime := time.Now().Sub(n.UpAt)
+
+	for id, peer := range n.peers {
+		peers = append(peers, map[string]string{
+			"id":      id,
+			"address": peer,
+		})
+	}
+
+	mu.Unlock()
+
+	return NodeStats{
+		ID:       n.ID,
+		Uptime:   time.Duration(uptime / time.Second),
+		Peers:    peers,
+		NodePort: n.Config.NodePort,
+	}
 }
 
 type NodeConfig struct {
@@ -210,7 +250,7 @@ func NewNode(config NodeConfig, chain *blockchain.Chain) *Node {
 	return &Node{
 		ID:         uuid.NewString(),
 		UpAt:       time.Now(),
-		chain:      chain,
+		Chain:      chain,
 		httpRouter: httpRouter,
 		peers:      make(map[string]string, 0),
 		Config:     config,

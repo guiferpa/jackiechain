@@ -5,39 +5,52 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
-func NewHTTPResponse(req *http.Request, statusCode int, body []byte) *http.Response {
+func newHTTPResponse(req *http.Request, statusCode int, header http.Header, body *bytes.Buffer) *http.Response {
 	var rdb io.ReadCloser = http.NoBody
 
-	if len(body) > 0 {
-		rdb = io.NopCloser(bytes.NewReader(body))
+	if body.Len() > 0 {
+		rdb = io.NopCloser(body)
 	}
 
 	resp := &http.Response{
-		StatusCode:       http.StatusOK,
+		StatusCode:       statusCode,
 		ProtoMajor:       1,
 		ProtoMinor:       1,
 		Request:          req,
 		TransferEncoding: []string{"utf8"},
-		Trailer:          nil,
+		Trailer:          header,
 		Body:             rdb,
+		Header:           header,
+		ContentLength:    int64(body.Len()),
 	}
 
 	return resp
 }
 
-func Response(w io.Writer, resp *http.Response) (int, error) {
+func Response(r *http.Request, w io.Writer, statusCode int, body *bytes.Buffer) error {
+	header := make(http.Header, 0)
+	header.Set("Content-Type", "application/json; charset=utf8")
+	header.Set("Date", time.Now().Format(time.RFC1123))
+
+	resp := newHTTPResponse(r, statusCode, header, body)
+
 	bs := &bytes.Buffer{}
-
 	if err := resp.Write(bs); err != nil {
-		return 0, err
+		return err
 	}
 
-	l, err := fmt.Fprint(w, bs)
+	_, err := fmt.Fprint(w, bs)
 	if err == io.EOF {
-		return l, nil
+		return nil
 	}
 
-	return l, err
+	return err
+}
+
+func ResponseNotFound(r *http.Request, w io.Writer) error {
+	body := "{\"message\": \"Not found\"}"
+	return Response(r, w, http.StatusNotFound, bytes.NewBufferString(body))
 }

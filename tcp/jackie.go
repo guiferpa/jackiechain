@@ -1,8 +1,8 @@
 package tcp
 
 import (
+	"bytes"
 	"errors"
-	"net"
 	"strings"
 )
 
@@ -12,14 +12,8 @@ const (
 	JACKIE_MESSAGE    = "MESSAGE"
 )
 
-func ParseJackieRequest(conn net.Conn) (string, []string, error) {
-	buf := make([]byte, 512)
-	_, err := conn.Read(buf)
-	if err != nil {
-		return "", nil, err
-	}
-
-	message := strings.Split(string(buf), " ")
+func ParseJackieRequest(b *bytes.Buffer) (string, []string, error) {
+	message := strings.Split(b.String(), " ")
 
 	if len(message) < 2 {
 		return "", nil, errors.New("incorrect jackie length protocol")
