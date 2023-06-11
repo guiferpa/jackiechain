@@ -3,14 +3,19 @@ package tcp
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
 	"net"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
@@ -19,19 +24,20 @@ import (
 
 var mu sync.Mutex
 
-type NodeHandler func(net.Conn) error
+type NodeHandler func(net.Conn, bool) error
 
 type NodeTerminateHandler func(os.Signal) (int, error)
 
 type Node struct {
 	ID               string
 	UpAt             time.Time
-	peers            map[string]string
 	Chain            *blockchain.Chain
+	Config           NodeConfig
+	peers            map[string]string
+	unconfirmedTxs   map[string]blockchain.Transaction
 	handler          NodeHandler
 	httpRouter       chi.Router
 	terminateHandler NodeTerminateHandler
-	Config           NodeConfig
 }
 
 type NodeStats struct {
@@ -41,14 +47,17 @@ type NodeStats struct {
 	NodePort string        `json:"node_port"`
 }
 
-func read(ln net.Listener, h NodeHandler) error {
+func read(ln net.Listener, h NodeHandler, verbose bool) error {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
 			return err
 		}
 
-		h(conn)
+		if err := h(conn, verbose); err != nil && err != io.EOF {
+			red := color.New(color.FgBlack, color.BgHiRed).SprintFunc()
+			log.Println(red(err))
+		}
 	}
 }
 
@@ -79,9 +88,6 @@ func send(addr string, msg []byte) error {
 }
 
 func (n *Node) Broadcast(msg []byte) error {
-	mu.Lock()
-	defer mu.Unlock()
-
 	for _, peer := range n.peers {
 		if err := send(peer, msg); err != nil {
 			return err
@@ -157,6 +163,54 @@ func (n *Node) RemovePeer(id string) error {
 	return nil
 }
 
+func (n *Node) RequestTxApprobation(tx blockchain.Transaction) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if n.unconfirmedTxs == nil {
+		n.unconfirmedTxs = make(map[string]blockchain.Transaction)
+	}
+
+	n.unconfirmedTxs[tx.CalculateHash()] = tx
+
+	txmsg, err := json.Marshal(tx)
+	if err != nil {
+		return err
+	}
+
+	msg := fmt.Sprintf("JACKIE %s %s %s", JACKIE_TX_APPROBATION, n.ID, base64.StdEncoding.EncodeToString(txmsg))
+
+	return n.Broadcast([]byte(msg))
+}
+
+func (n *Node) RequestTxApprobationOK(tx blockchain.Transaction, dstNid string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	txmsg, err := json.Marshal(tx)
+	if err != nil {
+		return err
+	}
+
+	msg := fmt.Sprintf("JACKIE %s %s %s %s", JACKIE_TX_APPROBATION_OK, n.ID, dstNid, base64.StdEncoding.EncodeToString(txmsg))
+
+	return n.Broadcast([]byte(msg))
+}
+
+func (n *Node) RequestTxApprobationFail(tx blockchain.Transaction, dstNid string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	txmsg, err := json.Marshal(tx)
+	if err != nil {
+		return err
+	}
+
+	msg := fmt.Sprintf("JACKIE %s %s %s %s", JACKIE_TX_APPROBATION_FAIL, n.ID, dstNid, base64.StdEncoding.EncodeToString(txmsg))
+
+	return n.Broadcast([]byte(msg))
+}
+
 func (n *Node) SetHandler(h NodeHandler) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -183,9 +237,10 @@ func (n *Node) Listen(sigc chan os.Signal) error {
 
 	mu.Lock()
 	handler := n.handler
+	verbose := n.Config.Verbose
 	mu.Unlock()
 
-	go read(ln, handler)
+	go read(ln, handler, verbose)
 
 	go write(n.ID, brdc)
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"log"
@@ -13,6 +14,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/fatih/color"
 	"github.com/guiferpa/jackiechain/blockchain"
 	"github.com/guiferpa/jackiechain/httputil"
 	"github.com/guiferpa/jackiechain/tcp"
@@ -43,16 +45,58 @@ func main() {
 	chain := blockchain.NewChain(blockchain.ChainOptions{})
 	node := tcp.NewNode(nodecfg, chain)
 
-	node.SetHandler(func(conn net.Conn) error {
+	node.SetHandler(func(conn net.Conn, verbose bool) error {
 		defer conn.Close()
 
-		bs := make([]byte, 1024)
-		if _, err := conn.Read(bs); err != nil {
+		message := make([]byte, 1024)
+		if _, err := conn.Read(message); err != nil {
 			return err
 		}
 
-		if act, args, err := tcp.ParseJackieRequest(bytes.NewBuffer(bs)); err == nil {
+		if verbose {
+			yellow := color.New(color.FgYellow).SprintFunc()
+			log.Println(yellow(string(message)))
+		}
+
+		if act, args, err := tcp.ParseJackieRequest(bytes.NewBuffer(message)); err == nil {
 			switch act {
+			case tcp.JACKIE_TX_APPROBATION_OK:
+				// jury := args[0]
+				// origin := args[1]
+				etx := strings.Trim(args[2], "\x00")
+
+				btx, err := base64.StdEncoding.DecodeString(etx)
+				if err != nil {
+					return err
+				}
+
+				tx := blockchain.Transaction{}
+				if err := json.Unmarshal(btx, &tx); err != nil {
+					return err
+				}
+
+				return node.Chain.AddTransaction(&tx)
+
+			case tcp.JACKIE_TX_APPROBATION:
+				nid := args[0]
+				etx := strings.Trim(args[1], "\x00")
+
+				btx, err := base64.StdEncoding.DecodeString(etx)
+				if err != nil {
+					return err
+				}
+
+				tx := blockchain.Transaction{}
+				if err := json.Unmarshal(btx, &tx); err != nil {
+					return err
+				}
+
+				if err := node.Chain.AddTransaction(&tx); err != nil {
+					return node.RequestTxApprobationFail(tx, nid)
+				}
+
+				return node.RequestTxApprobationOK(tx, nid)
+
 			case tcp.JACKIE_CONNECT:
 				if err := node.AddPeer(args[0], args[1], args[2]); err != nil {
 					if err.Error() == "peer already added" {
@@ -87,7 +131,7 @@ func main() {
 				log.Print(strings.Join(args, " "))
 			}
 		} else {
-			req, err := tcp.ParseHTTPRequest(bytes.NewBuffer(bs))
+			req, err := tcp.ParseHTTPRequest(bytes.NewBuffer(message))
 			if err != nil {
 				return err
 			}
@@ -146,6 +190,40 @@ func main() {
 
 			if req.Method == http.MethodPost {
 				switch req.URL.Path {
+				case "/tx":
+					body := struct {
+						Sender      string `json:"sender"`
+						Receiver    string `json:"receiver"`
+						Amount      int64  `json:"amount"`
+						PrivateSeed string `json:"private_seed"`
+					}{}
+
+					if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+						return err
+					}
+					defer req.Body.Close()
+
+					w, err := wallet.ParseWallet(body.PrivateSeed)
+					if err != nil {
+						return err
+					}
+
+					if body.Sender != w.GetAddress() {
+						return httputil.ResponseBadRequest(req, conn, "Invalid wallet sender address")
+					}
+
+					tx := blockchain.NewSignedTransaction(blockchain.TransactionOptions{
+						Sender:       *w,
+						ReceiverAddr: body.Receiver,
+						Amount:       body.Amount,
+					})
+
+					if err := node.RequestTxApprobation(*tx); err != nil {
+						return err
+					}
+
+					return httputil.Response(req, conn, http.StatusNoContent, nil)
+
 				case "/wallets":
 					w, err := wallet.NewWallet()
 					if err != nil {
