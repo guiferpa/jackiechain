@@ -34,7 +34,7 @@ type Node struct {
 	Chain            *blockchain.Chain
 	Config           NodeConfig
 	peers            map[string]string
-	unconfirmedTxs   map[string]blockchain.Transaction
+	unconfirmedTxs   map[string][]string
 	handler          NodeHandler
 	httpRouter       chi.Router
 	terminateHandler NodeTerminateHandler
@@ -168,22 +168,27 @@ func (n *Node) RequestTxApprobation(tx blockchain.Transaction) error {
 	defer mu.Unlock()
 
 	if n.unconfirmedTxs == nil {
-		n.unconfirmedTxs = make(map[string]blockchain.Transaction)
+		n.unconfirmedTxs = make(map[string][]string)
 	}
-
-	n.unconfirmedTxs[tx.CalculateHash()] = tx
 
 	txmsg, err := json.Marshal(tx)
 	if err != nil {
 		return err
 	}
 
-	msg := fmt.Sprintf("JACKIE %s %s %s", JACKIE_TX_APPROBATION, n.ID, base64.StdEncoding.EncodeToString(txmsg))
+	for id, peer := range n.peers {
+		n.unconfirmedTxs[tx.CalculateHash()] = append(n.unconfirmedTxs[tx.CalculateHash()], id)
 
-	return n.Broadcast([]byte(msg))
+		msg := bytes.NewBufferString(fmt.Sprintf("JACKIE %s %s %s", JACKIE_TX_APPROBATION, n.ID, base64.StdEncoding.EncodeToString(txmsg)))
+		if err := send(peer, msg.Bytes()); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (n *Node) RequestTxApprobationOK(tx blockchain.Transaction, dstNid string) error {
+func (n *Node) RequestTxApprobationOK(tx blockchain.Transaction, peerid string) error {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -192,9 +197,12 @@ func (n *Node) RequestTxApprobationOK(tx blockchain.Transaction, dstNid string) 
 		return err
 	}
 
-	msg := fmt.Sprintf("JACKIE %s %s %s %s", JACKIE_TX_APPROBATION_OK, n.ID, dstNid, base64.StdEncoding.EncodeToString(txmsg))
+	if addr, ok := n.peers[peerid]; ok {
+		msg := fmt.Sprintf("JACKIE %s %s %s %s", JACKIE_TX_APPROBATION_OK, n.ID, peerid, base64.StdEncoding.EncodeToString(txmsg))
+		return send(addr, []byte(msg))
+	}
 
-	return n.Broadcast([]byte(msg))
+	return nil
 }
 
 func (n *Node) RequestTxApprobationFail(tx blockchain.Transaction, dstNid string) error {
@@ -209,6 +217,30 @@ func (n *Node) RequestTxApprobationFail(tx blockchain.Transaction, dstNid string
 	msg := fmt.Sprintf("JACKIE %s %s %s %s", JACKIE_TX_APPROBATION_FAIL, n.ID, dstNid, base64.StdEncoding.EncodeToString(txmsg))
 
 	return n.Broadcast([]byte(msg))
+}
+
+func (n *Node) CommitTxApproved(jury string, tx *blockchain.Transaction) error {
+	peers := n.unconfirmedTxs[tx.CalculateHash()]
+
+	npeers := make([]string, 0)
+	for _, peer := range peers {
+		if peer != jury {
+			npeers = append(npeers, peer)
+		}
+	}
+
+	if len(npeers) == 0 {
+		if err := n.Chain.AddTransaction(tx); err != nil {
+			return err
+		}
+
+		delete(n.unconfirmedTxs, tx.CalculateHash())
+		return nil
+	}
+
+	n.unconfirmedTxs[tx.CalculateHash()] = npeers
+
+	return nil
 }
 
 func (n *Node) SetHandler(h NodeHandler) {

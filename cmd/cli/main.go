@@ -61,7 +61,7 @@ func main() {
 		if act, args, err := tcp.ParseJackieRequest(bytes.NewBuffer(message)); err == nil {
 			switch act {
 			case tcp.JACKIE_TX_APPROBATION_OK:
-				// jury := args[0]
+				jury := args[0]
 				// origin := args[1]
 				etx := strings.Trim(args[2], "\x00")
 
@@ -75,7 +75,11 @@ func main() {
 					return err
 				}
 
-				return node.Chain.AddTransaction(&tx)
+				if err := node.CommitTxApproved(jury, &tx); err != nil {
+					return err
+				}
+
+				log.Println("Transaction", tx.CalculateHash(), "approved by node", jury)
 
 			case tcp.JACKIE_TX_APPROBATION:
 				nid := args[0]
@@ -95,7 +99,11 @@ func main() {
 					return node.RequestTxApprobationFail(tx, nid)
 				}
 
-				return node.RequestTxApprobationOK(tx, nid)
+				if err := node.RequestTxApprobationOK(tx, nid); err != nil {
+					return err
+				}
+
+				log.Println("Transaction", tx.CalculateHash(), "created")
 
 			case tcp.JACKIE_CONNECT:
 				if err := node.AddPeer(args[0], args[1], args[2]); err != nil {
