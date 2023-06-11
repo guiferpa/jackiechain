@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/mr-tron/base58"
 
@@ -37,10 +38,11 @@ type Transaction struct {
 	Sender    string `json:"sender"`
 	Receiver  string `json:"receiver"`
 	Amount    int64  `json:"amount"`
+	Timestamp int64  `json:"timestamp"`
 }
 
 func (t *Transaction) CalculateHash() string {
-	payload := fmt.Sprintf("%s::%s::%v", t.Sender, t.Receiver, t.Amount)
+	payload := fmt.Sprintf("%s::%s::%v::%v", t.Sender, t.Receiver, t.Amount, t.Timestamp)
 	h := sha256.New()
 	h.Write([]byte(payload))
 	return hex.EncodeToString(h.Sum(nil))
@@ -73,9 +75,10 @@ type TransactionOptions struct {
 
 func NewTransaction(opts TransactionOptions) *Transaction {
 	return &Transaction{
-		Sender:   opts.Sender.GetAddress(),
-		Receiver: opts.ReceiverAddr,
-		Amount:   opts.Amount,
+		Sender:    opts.Sender.GetAddress(),
+		Receiver:  opts.ReceiverAddr,
+		Amount:    opts.Amount,
+		Timestamp: time.Now().UnixNano(),
 	}
 }
 

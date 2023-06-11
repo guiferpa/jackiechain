@@ -103,7 +103,7 @@ func main() {
 					return err
 				}
 
-				log.Println("Transaction", tx.CalculateHash(), "created")
+				log.Println("Transaction", tx.CalculateHash(), "approved")
 
 			case tcp.JACKIE_CONNECT:
 				if err := node.AddPeer(args[0], args[1], args[2]); err != nil {
