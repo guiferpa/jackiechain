@@ -141,6 +141,7 @@ func main() {
 				log.Println("Transaction", tx.CalculateHash(), "approved")
 
 			case tcp.JACKIE_CONNECT_LOOPBACK:
+				fmt.Println(args)
 				if err := node.AddPeer(args[0], args[1], args[2]); err != nil {
 					if err.Error() == "peer already added" {
 						return nil
