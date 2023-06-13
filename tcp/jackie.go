@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/google/uuid"
 )
 
 const (
@@ -32,8 +30,7 @@ func (pj *PeerJackie) GetAddr() string {
 	return fmt.Sprintf("%s:%s", pj.Host, pj.Port)
 }
 
-func NewPeerJackie(addr string) *PeerJackie {
-	id := uuid.NewString()
+func NewPeerJackie(id, addr string) *PeerJackie {
 	host := "0.0.0.0"
 	port := ""
 

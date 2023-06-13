@@ -31,7 +31,7 @@ type Node struct {
 	UpAt             time.Time
 	Chain            *blockchain.Chain
 	Config           NodeConfig
-	peers            map[string]string
+	peers            map[string]*PeerJackie
 	unconfirmedTxs   map[string][]string
 	handler          NodeHandler
 	terminateHandler NodeTerminateHandler
@@ -40,7 +40,7 @@ type Node struct {
 type NodeStats struct {
 	ID       string        `json:"id"`
 	Uptime   time.Duration `json:"uptime"`
-	Peers    []interface{} `json:"peers"`
+	Peers    []PeerJackie  `json:"peers"`
 	NodePort string        `json:"node_port"`
 }
 
@@ -91,8 +91,11 @@ func Send(addr string, msg []byte) error {
 	return nil
 }
 
-func SendJackieRequest(addr string, act, msg string) error {
-	return Send(addr, []byte(fmt.Sprintf("JACKIE %s %s", act, msg)))
+func SendJackieRequest(peer *PeerJackie, act, msg string) error {
+	return Send(
+		peer.GetAddr(),
+		[]byte(fmt.Sprintf("JACKIE %s %s", act, msg)),
+	)
 }
 
 func (n *Node) Broadcast(act, msg string) error {
@@ -105,21 +108,18 @@ func (n *Node) Broadcast(act, msg string) error {
 	return nil
 }
 
-func (n *Node) ShareConnectionState(host, port string) error {
+func (n *Node) ShareConnectionState(peer *PeerJackie) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	addr := fmt.Sprintf("%s:%s", host, port)
 	message := fmt.Sprintf("%s %s %s", n.ID, "0.0.0.0", n.Config.NodePort)
-	if err := SendJackieRequest(addr, JACKIE_CONNECT_LOOPBACK, message); err != nil {
+	if err := SendJackieRequest(peer, JACKIE_CONNECT_LOOPBACK, message); err != nil {
 		return err
 	}
 
 	for key, peer := range n.peers {
-		pport := strings.Split(peer, ":")[1]
-		addr = fmt.Sprintf("0.0.0.0:%s", port)
-		message = fmt.Sprintf("%s %s %s", key, "0.0.0.0", pport)
-		if err := SendJackieRequest(addr, JACKIE_CONNECT, message); err != nil {
+		message = fmt.Sprintf("%s %s %s", key, peer.Host, peer.Port)
+		if err := SendJackieRequest(peer, JACKIE_CONNECT, message); err != nil {
 			return err
 		}
 	}
@@ -129,7 +129,7 @@ func (n *Node) ShareConnectionState(host, port string) error {
 
 func (n *Node) Connect(peer *PeerJackie) error {
 	message := fmt.Sprintf("%s %s %s", n.ID, "0.0.0.0", n.Config.NodePort)
-	return SendJackieRequest(peer.GetAddr(), JACKIE_CONNECT, message)
+	return SendJackieRequest(peer, JACKIE_CONNECT, message)
 }
 
 func (n *Node) ConnectOK(key string) error {
@@ -153,9 +153,11 @@ func (n *Node) DisconnectPeers() error {
 	return nil
 }
 
-func (n *Node) AddPeer(id, host, port string) error {
+func (n *Node) AddPeer(peer *PeerJackie) error {
 	mu.Lock()
 	defer mu.Unlock()
+
+	id := peer.ID
 
 	if id == n.ID {
 		return errors.New("it's not possible add itself")
@@ -165,7 +167,7 @@ func (n *Node) AddPeer(id, host, port string) error {
 		return errors.New("peer already added")
 	}
 
-	n.peers[id] = fmt.Sprintf("%s:%s", host, port)
+	n.peers[id] = peer
 
 	return nil
 }
@@ -289,8 +291,7 @@ func (n *Node) RequestDownloadBlockchain(peer *PeerJackie) error {
 	defer mu.Unlock()
 
 	message := fmt.Sprintf("%s", n.ID)
-	addr := peer.GetAddr()
-	if err := SendJackieRequest(addr, JACKIE_DOWNLOAD_BLOACKCHAIN, message); err != nil {
+	if err := SendJackieRequest(peer, JACKIE_DOWNLOAD_BLOACKCHAIN, message); err != nil {
 		return err
 	}
 
@@ -352,15 +353,12 @@ func (n *Node) Stats() NodeStats {
 	mu.Lock()
 	defer mu.Unlock()
 
-	peers := make([]interface{}, 0)
+	peers := make([]PeerJackie, 0)
 
 	uptime := time.Now().Sub(n.UpAt)
 
-	for id, peer := range n.peers {
-		peers = append(peers, map[string]string{
-			"id":      id,
-			"address": strings.Trim(peer, "\x00"),
-		})
+	for _, peer := range n.peers {
+		peers = append(peers, *peer)
 	}
 
 	return NodeStats{
@@ -381,7 +379,7 @@ func NewNode(config NodeConfig, chain *blockchain.Chain) *Node {
 		ID:     uuid.NewString(),
 		UpAt:   time.Now(),
 		Chain:  chain,
-		peers:  make(map[string]string, 0),
+		peers:  make(map[string]*PeerJackie, 0),
 		Config: config,
 	}
 }

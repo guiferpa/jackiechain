@@ -143,8 +143,8 @@ func main() {
 				log.Println("Transaction", tx.CalculateHash(), "approved")
 
 			case tcp.JACKIE_CONNECT_LOOPBACK:
-				fmt.Println(args)
-				if err := node.AddPeer(args[0], args[1], args[2]); err != nil {
+				lpeer := tcp.NewPeerJackie(args[0], fmt.Sprintf("%s:%s", args[1], args[2]))
+				if err := node.AddPeer(lpeer); err != nil {
 					if err.Error() == "peer already added" {
 						return nil
 					}
@@ -171,7 +171,8 @@ func main() {
 				}
 
 			case tcp.JACKIE_CONNECT:
-				if err := node.AddPeer(args[0], args[1], args[2]); err != nil {
+				lpeer := tcp.NewPeerJackie(args[0], fmt.Sprintf("%s:%s", args[1], args[2]))
+				if err := node.AddPeer(lpeer); err != nil {
 					if err.Error() == "peer already added" {
 						return nil
 					}
@@ -189,7 +190,7 @@ func main() {
 					return err
 				}
 
-				if err := node.ShareConnectionState(args[1], args[2]); err != nil {
+				if err := node.ShareConnectionState(lpeer); err != nil {
 					return err
 				}
 
@@ -348,7 +349,7 @@ func main() {
 	log.Println("Node is running at", node.Config.NodePort)
 
 	if connect != "" {
-		peer = tcp.NewPeerJackie(connect)
+		peer = tcp.NewPeerJackie("", connect)
 		if err := node.Connect(peer); err != nil {
 			panic(err)
 		}
