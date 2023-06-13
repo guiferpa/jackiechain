@@ -12,9 +12,11 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/fatih/color"
+
 	"github.com/guiferpa/jackiechain/blockchain"
 	"github.com/guiferpa/jackiechain/httputil"
 	"github.com/guiferpa/jackiechain/tcp"
@@ -26,6 +28,8 @@ var (
 	port    string
 	verbose bool
 )
+
+var mu sync.Mutex
 
 func init() {
 	flag.StringVar(&peer, "peer", "", "set peer")
@@ -40,7 +44,10 @@ func main() {
 		NodePort: port,
 		Verbose:  verbose,
 	}
-	chain := blockchain.NewChain(blockchain.ChainOptions{})
+	chain := blockchain.NewChain(blockchain.ChainOptions{
+		MiningDifficulty: 2,
+		MiningReward:     10,
+	})
 	node := tcp.NewNode(nodecfg, chain)
 
 	node.SetHandler(func(conn net.Conn, verbose bool) error {
@@ -58,6 +65,35 @@ func main() {
 
 		if act, args, err := tcp.ParseJackieRequest(bytes.NewBuffer(message)); err == nil {
 			switch act {
+			case tcp.JACKIE_DOWNLOAD_BLOACKCHAIN_OK:
+				raw := args[2]
+				raw = strings.Trim(raw, "\x00")
+
+				bs, err := base64.StdEncoding.DecodeString(raw)
+				if err != nil {
+					return err
+				}
+
+				chain := &blockchain.Chain{}
+				if err := json.NewDecoder(bytes.NewBuffer(bs)).Decode(chain); err != nil {
+					return err
+				}
+
+				mu.Lock()
+				node.Chain = chain
+				mu.Unlock()
+
+				log.Println("Blockchain with size equals", len(bs), "bytes downloaded sussccesful from", args[0])
+
+			case tcp.JACKIE_DOWNLOAD_BLOACKCHAIN:
+				log.Println("Transfering blockchain state to", args[0])
+
+				s, err := node.UploadBlockchainTo(args[0])
+				if err != nil {
+					return err
+				}
+
+				log.Println("Blockchain transfered with size equals", s, "bytes to", args[0])
 
 			case tcp.JACKIE_TX_APPROBATION_OK:
 				jury := args[0]
@@ -118,6 +154,18 @@ func main() {
 				}
 
 				log.Println("Connected to", args[0])
+
+				mu.Lock()
+				isChainNil := node.Chain == nil
+				mu.Unlock()
+
+				if isChainNil && peer != "" {
+					log.Println("Downloading blockchain from", fmt.Sprintf("0.0.0.0:%s", peer))
+
+					if err := node.RequestDownloadBlockchain("0.0.0.0", peer); err != nil {
+						return err
+					}
+				}
 
 			case tcp.JACKIE_CONNECT:
 				if err := node.AddPeer(args[0], args[1], args[2]); err != nil {
@@ -297,17 +345,13 @@ func main() {
 	log.Println("Node is running at", node.Config.NodePort)
 
 	if peer != "" {
-		log.Println("Downloading blockchain from", fmt.Sprintf("0.0.0.0:%s", peer))
-
-		if err := node.RequestDownloadBlockchain("0.0.0.0", peer); err != nil {
-			panic(err)
-		}
-
-		log.Println("Blockchain download's completed")
-
 		if err := node.Connect("0.0.0.0", peer); err != nil {
 			panic(err)
 		}
+
+		mu.Lock()
+		node.Chain = nil
+		mu.Unlock()
 	}
 
 	<-sigc

@@ -87,6 +87,10 @@ func Send(addr string, msg []byte) error {
 	return nil
 }
 
+func SendJackieRequest(addr string, act, msg string) error {
+	return Send(addr, []byte(fmt.Sprintf("JACKIE %s %s", act, msg)))
+}
+
 func (n *Node) Broadcast(msg []byte) error {
 	for _, peer := range n.peers {
 		if err := Send(peer, msg); err != nil {
@@ -227,8 +231,25 @@ func (n *Node) RequestTxApprobationFail(tx blockchain.Transaction, dstNid string
 	}
 
 	msg := fmt.Sprintf("JACKIE %s %s %s %s", JACKIE_TX_APPROBATION_FAIL, n.ID, dstNid, base64.StdEncoding.EncodeToString(txmsg))
-
 	return n.Broadcast([]byte(msg))
+}
+
+func (n *Node) UploadBlockchainTo(key string) (int, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	buf, err := json.Marshal(n.Chain)
+	if err != nil {
+		return 0, err
+	}
+
+	key = string(bytes.Trim([]byte(key), "\x00"))
+	if peer, ok := n.peers[key]; ok {
+		message := fmt.Sprintf("%s %s %s", n.ID, key, base64.StdEncoding.EncodeToString(buf))
+		return len(buf), SendJackieRequest(peer, JACKIE_DOWNLOAD_BLOACKCHAIN_OK, message)
+	}
+
+	return 0, errors.New(fmt.Sprintf("there's no peer with key equals %s to transfer blockchain's state", key))
 }
 
 func (n *Node) CommitTxApproved(jury string, tx *blockchain.Transaction) error {
@@ -328,9 +349,10 @@ func (n *Node) Listen(sigc chan os.Signal) error {
 }
 
 func (n *Node) Stats() NodeStats {
-	peers := make([]interface{}, 0)
-
 	mu.Lock()
+	defer mu.Unlock()
+
+	peers := make([]interface{}, 0)
 
 	uptime := time.Now().Sub(n.UpAt)
 
@@ -340,8 +362,6 @@ func (n *Node) Stats() NodeStats {
 			"address": strings.Trim(peer, "\x00"),
 		})
 	}
-
-	mu.Unlock()
 
 	return NodeStats{
 		ID:       n.ID,
