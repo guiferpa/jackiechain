@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
@@ -16,7 +15,6 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
 	"github.com/guiferpa/jackiechain/blockchain"
@@ -36,7 +34,6 @@ type Node struct {
 	peers            map[string]string
 	unconfirmedTxs   map[string][]string
 	handler          NodeHandler
-	httpRouter       chi.Router
 	terminateHandler NodeTerminateHandler
 }
 
@@ -47,22 +44,28 @@ type NodeStats struct {
 	NodePort string        `json:"node_port"`
 }
 
-func read(ln net.Listener, h NodeHandler, verbose bool) error {
+func read(ln net.Listener, handler NodeHandler, verbose bool) error {
+	red := color.New(color.BgRed, color.FgHiBlack).SprintFunc()
+
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
 			return err
 		}
 
-		if err := h(conn, verbose); err != nil && err != io.EOF {
-			red := color.New(color.FgBlack, color.BgHiRed).SprintFunc()
+		if err := handler(conn, verbose); err != nil {
 			log.Println(red(err))
 		}
 	}
 }
 
-func write(nodeID string, brdc chan []byte) {
+func write(n *Node) {
 	reader := bufio.NewReader(os.Stdin)
+
+	mu.Lock()
+	brd := n.Broadcast
+	nid := n.ID
+	mu.Unlock()
 
 	for {
 		s, err := reader.ReadString('\n')
@@ -70,7 +73,8 @@ func write(nodeID string, brdc chan []byte) {
 			panic(err)
 		}
 
-		brdc <- []byte(fmt.Sprintf("%s: %s", nodeID, strings.Trim(s, string('\n'))))
+		message := fmt.Sprintf("%s: %s", nid, strings.Trim(s, string('\n')))
+		brd(JACKIE_MESSAGE, message)
 	}
 }
 
@@ -314,9 +318,6 @@ func (n *Node) Listen(sigc chan os.Signal) error {
 		return err
 	}
 
-	connc := make(chan net.Conn)
-	brdc := make(chan []byte)
-
 	mu.Lock()
 	handler := n.handler
 	verbose := n.Config.Verbose
@@ -324,17 +325,11 @@ func (n *Node) Listen(sigc chan os.Signal) error {
 
 	go read(ln, handler, verbose)
 
-	go write(n.ID, brdc)
+	go write(n)
 
-	go func(connc chan net.Conn, brdc chan []byte) {
+	go func() {
 		for {
 			select {
-			case brd := <-brdc:
-				message := fmt.Sprintf("%s", string(brd))
-				if err := n.Broadcast(JACKIE_MESSAGE, message); err != nil {
-					panic(err)
-				}
-
 			case sig := <-sigc:
 				mu.Lock()
 				handler := n.terminateHandler
@@ -348,7 +343,7 @@ func (n *Node) Listen(sigc chan os.Signal) error {
 				os.Exit(code)
 			}
 		}
-	}(connc, brdc)
+	}()
 
 	return nil
 }
@@ -382,14 +377,11 @@ type NodeConfig struct {
 }
 
 func NewNode(config NodeConfig, chain *blockchain.Chain) *Node {
-	httpRouter := chi.NewRouter()
-
 	return &Node{
-		ID:         uuid.NewString(),
-		UpAt:       time.Now(),
-		Chain:      chain,
-		httpRouter: httpRouter,
-		peers:      make(map[string]string, 0),
-		Config:     config,
+		ID:     uuid.NewString(),
+		UpAt:   time.Now(),
+		Chain:  chain,
+		peers:  make(map[string]string, 0),
+		Config: config,
 	}
 }
