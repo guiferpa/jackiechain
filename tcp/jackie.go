@@ -8,6 +8,8 @@ import (
 )
 
 const (
+	JACKIE_SYNC_UPTIME_OK          = "SYNC_UPTIME_OK"
+	JACKIE_SYNC_UPTIME             = "SYNC_UPTIME"
 	JACKIE_DOWNLOAD_BLOACKCHAIN_OK = "DOWNLOAD_BLOCKCHAIN_OK"
 	JACKIE_DOWNLOAD_BLOACKCHAIN    = "DOWNLOAD_BLOCKCHAIN"
 	JACKIE_TX_APPROBATION_FAIL     = "TX_APPROBATION_FAIL"
@@ -31,7 +33,7 @@ func (pj *PeerJackie) GetAddr() string {
 }
 
 func NewPeerJackie(id, addr string) *PeerJackie {
-	host := "0.0.0.0"
+	host := ""
 	port := ""
 
 	addrspl := strings.Split(addr, ":")

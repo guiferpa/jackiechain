@@ -30,6 +30,7 @@ type Node struct {
 	ID               string
 	UpAt             time.Time
 	Chain            *blockchain.Chain
+	WalletAddress    string
 	Config           NodeConfig
 	peers            map[string]*PeerJackie
 	unconfirmedTxs   map[string][]string
@@ -75,6 +76,23 @@ func write(n *Node) {
 
 		message := fmt.Sprintf("%s: %s", nid, strings.Trim(s, string('\n')))
 		brd(JACKIE_MESSAGE, message)
+	}
+}
+
+func (n *Node) Mine() {
+	ticker := time.NewTicker(time.Second * 2)
+
+	for range ticker.C {
+		mu.Lock()
+		if n.Chain != nil {
+			if len(n.Chain.PendingTransactions) > 0 {
+				log.Println("Start mining")
+				h := n.Chain.MinePendingTransactions(n.WalletAddress)
+				log.Println("Block", h, "was mined")
+				log.Println("End mining")
+			}
+		}
+		mu.Unlock()
 	}
 }
 
@@ -313,7 +331,7 @@ func (n *Node) SetTerminateHandler(h NodeTerminateHandler) {
 }
 
 func (n *Node) Listen(sigc chan os.Signal) error {
-	addr := fmt.Sprintf("0.0.0.0:%s", n.Config.NodePort)
+	addr := fmt.Sprintf(":%s", n.Config.NodePort)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -370,16 +388,18 @@ func (n *Node) Stats() NodeStats {
 }
 
 type NodeConfig struct {
-	NodePort string
-	Verbose  bool
+	NodePort      string
+	Verbose       bool
+	WalletAddress string
 }
 
 func NewNode(config NodeConfig, chain *blockchain.Chain) *Node {
 	return &Node{
-		ID:     uuid.NewString(),
-		UpAt:   time.Now(),
-		Chain:  chain,
-		peers:  make(map[string]*PeerJackie, 0),
-		Config: config,
+		ID:            uuid.NewString(),
+		UpAt:          time.Now(),
+		Chain:         chain,
+		WalletAddress: config.WalletAddress,
+		peers:         make(map[string]*PeerJackie, 0),
+		Config:        config,
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -14,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/fatih/color"
 
@@ -24,9 +26,10 @@ import (
 )
 
 var (
-	connect string
-	port    string
-	verbose bool
+	connect    string
+	port       string
+	verbose    bool
+	walletAddr string
 )
 
 var mu sync.Mutex
@@ -37,10 +40,15 @@ func init() {
 	flag.StringVar(&connect, "connect", "", "set connection")
 	flag.StringVar(&port, "port", "3000", "set port")
 	flag.BoolVar(&verbose, "verbose", false, "set verbose")
+	flag.StringVar(&walletAddr, "wallet", "", "set wallet address")
 }
 
 func main() {
 	flag.Parse()
+
+	if walletAddr == "" {
+		panic(errors.New("invalid wallet"))
+	}
 
 	nodecfg := tcp.NodeConfig{
 		NodePort: port,
@@ -49,6 +57,7 @@ func main() {
 	chain := blockchain.NewChain(blockchain.ChainOptions{
 		MiningDifficulty: 2,
 		MiningReward:     10,
+		MiningTicker:     2 * time.Minute,
 	})
 	node := tcp.NewNode(nodecfg, chain)
 
@@ -67,18 +76,20 @@ func main() {
 
 		if act, args, err := tcp.ParseJackieRequest(bytes.NewBuffer(message)); err == nil {
 			switch act {
+			case tcp.JACKIE_SYNC_UPTIME:
+
 			case tcp.JACKIE_DOWNLOAD_BLOACKCHAIN_OK:
 				raw := args[2]
 				raw = strings.Trim(raw, "\x00")
 
 				bs, err := base64.StdEncoding.DecodeString(raw)
 				if err != nil {
-					return err
+					panic(err)
 				}
 
 				chain := &blockchain.Chain{}
 				if err := json.NewDecoder(bytes.NewBuffer(bs)).Decode(chain); err != nil {
-					return err
+					panic(err)
 				}
 
 				mu.Lock()
@@ -99,7 +110,6 @@ func main() {
 
 			case tcp.JACKIE_TX_APPROBATION_OK:
 				jury := args[0]
-				// origin := args[1]
 				etx := strings.Trim(args[2], "\x00")
 
 				btx, err := base64.StdEncoding.DecodeString(etx)
@@ -358,6 +368,8 @@ func main() {
 		node.Chain = nil
 		mu.Unlock()
 	}
+
+	go node.Mine()
 
 	<-sigc
 }
