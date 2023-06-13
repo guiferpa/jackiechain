@@ -5,13 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
 	"syscall"
 
 	"github.com/fatih/color"
@@ -32,8 +32,6 @@ func init() {
 	flag.StringVar(&port, "port", "3000", "set port")
 	flag.BoolVar(&verbose, "verbose", false, "set verbose")
 }
-
-var mu sync.Mutex
 
 func main() {
 	flag.Parse()
@@ -60,6 +58,7 @@ func main() {
 
 		if act, args, err := tcp.ParseJackieRequest(bytes.NewBuffer(message)); err == nil {
 			switch act {
+
 			case tcp.JACKIE_TX_APPROBATION_OK:
 				jury := args[0]
 				// origin := args[1]
@@ -105,6 +104,21 @@ func main() {
 
 				log.Println("Transaction", tx.CalculateHash(), "approved")
 
+			case tcp.JACKIE_CONNECT_LOOPBACK:
+				if err := node.AddPeer(args[0], args[1], args[2]); err != nil {
+					if err.Error() == "peer already added" {
+						return nil
+					}
+
+					if err.Error() == "it's not possible add itself" {
+						return nil
+					}
+
+					return err
+				}
+
+				log.Println("Connected to", args[0])
+
 			case tcp.JACKIE_CONNECT:
 				if err := node.AddPeer(args[0], args[1], args[2]); err != nil {
 					if err.Error() == "peer already added" {
@@ -119,6 +133,10 @@ func main() {
 				}
 
 				log.Println("Connected to", args[0])
+
+				if err := node.ConnectOK(args[0]); err != nil {
+					return err
+				}
 
 				if err := node.ShareConnectionState(args[1], args[2]); err != nil {
 					return err
@@ -279,6 +297,14 @@ func main() {
 	log.Println("Node is running at", node.Config.NodePort)
 
 	if peer != "" {
+		log.Println("Downloading blockchain from", fmt.Sprintf("0.0.0.0:%s", peer))
+
+		if err := node.RequestDownloadBlockchain("0.0.0.0", peer); err != nil {
+			panic(err)
+		}
+
+		log.Println("Blockchain download's completed")
+
 		if err := node.Connect("0.0.0.0", peer); err != nil {
 			panic(err)
 		}

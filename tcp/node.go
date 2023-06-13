@@ -74,7 +74,7 @@ func write(nodeID string, brdc chan []byte) {
 	}
 }
 
-func send(addr string, msg []byte) error {
+func Send(addr string, msg []byte) error {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return err
@@ -89,7 +89,7 @@ func send(addr string, msg []byte) error {
 
 func (n *Node) Broadcast(msg []byte) error {
 	for _, peer := range n.peers {
-		if err := send(peer, msg); err != nil {
+		if err := Send(peer, msg); err != nil {
 			return err
 		}
 	}
@@ -101,15 +101,15 @@ func (n *Node) ShareConnectionState(host, port string) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	message := []byte(fmt.Sprintf("JACKIE %s %s 0.0.0.0 %s", JACKIE_CONNECT, n.ID, n.Config.NodePort))
-	if err := send(fmt.Sprintf("0.0.0.0:%s", port), message); err != nil {
+	message := []byte(fmt.Sprintf("JACKIE %s %s 0.0.0.0 %s", JACKIE_CONNECT_LOOPBACK, n.ID, n.Config.NodePort))
+	if err := Send(fmt.Sprintf("0.0.0.0:%s", port), message); err != nil {
 		return err
 	}
 
 	for key, peer := range n.peers {
 		pport := strings.Split(peer, ":")[1]
 		message = []byte(fmt.Sprintf("JACKIE %s %s 0.0.0.0 %s", JACKIE_CONNECT, key, pport))
-		if err := send(fmt.Sprintf("0.0.0.0:%s", port), message); err != nil {
+		if err := Send(fmt.Sprintf("0.0.0.0:%s", port), message); err != nil {
 			return err
 		}
 	}
@@ -119,7 +119,19 @@ func (n *Node) ShareConnectionState(host, port string) error {
 
 func (n *Node) Connect(host, port string) error {
 	message := []byte(fmt.Sprintf("JACKIE %s %s 0.0.0.0 %s", JACKIE_CONNECT, n.ID, n.Config.NodePort))
-	return send(fmt.Sprintf("%s:%s", host, port), message)
+	return Send(fmt.Sprintf("%s:%s", host, port), message)
+}
+
+func (n *Node) ConnectOK(key string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if peer, ok := n.peers[key]; ok {
+		message := []byte(fmt.Sprintf("JACKIE %s %s", JACKIE_CONNECT_OK, n.ID))
+		return Send(peer, message)
+	}
+
+	return errors.New(fmt.Sprintf("unheathly node, it wasn't possible download blockchaim from %s", key))
 }
 
 func (n *Node) DisconnectPeers() error {
@@ -180,7 +192,7 @@ func (n *Node) RequestTxApprobation(tx blockchain.Transaction) error {
 		n.unconfirmedTxs[tx.CalculateHash()] = append(n.unconfirmedTxs[tx.CalculateHash()], id)
 
 		msg := bytes.NewBufferString(fmt.Sprintf("JACKIE %s %s %s", JACKIE_TX_APPROBATION, n.ID, base64.StdEncoding.EncodeToString(txmsg)))
-		if err := send(peer, msg.Bytes()); err != nil {
+		if err := Send(peer, msg.Bytes()); err != nil {
 			return err
 		}
 	}
@@ -199,7 +211,7 @@ func (n *Node) RequestTxApprobationOK(tx blockchain.Transaction, peerid string) 
 
 	if addr, ok := n.peers[peerid]; ok {
 		msg := fmt.Sprintf("JACKIE %s %s %s %s", JACKIE_TX_APPROBATION_OK, n.ID, peerid, base64.StdEncoding.EncodeToString(txmsg))
-		return send(addr, []byte(msg))
+		return Send(addr, []byte(msg))
 	}
 
 	return nil
@@ -255,6 +267,19 @@ func (n *Node) SetTerminateHandler(h NodeTerminateHandler) {
 	defer mu.Unlock()
 
 	n.terminateHandler = h
+}
+
+func (n *Node) RequestDownloadBlockchain(addr, port string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	msg := fmt.Sprintf("JACKIE %s %s", JACKIE_DOWNLOAD_BLOACKCHAIN, n.ID)
+	if err := Send(fmt.Sprintf("%s:%s", addr, port), []byte(msg)); err != nil {
+		return errors.New(fmt.Sprintf("unheathly node, it wasn't possible download blockchaim from %s:%s", addr, port))
+	}
+
+	return nil
+
 }
 
 func (n *Node) Listen(sigc chan os.Signal) error {
