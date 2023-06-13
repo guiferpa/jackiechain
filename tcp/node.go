@@ -127,9 +127,9 @@ func (n *Node) ShareConnectionState(host, port string) error {
 	return nil
 }
 
-func (n *Node) Connect(host, port string) error {
-	message := []byte(fmt.Sprintf("JACKIE %s %s 0.0.0.0 %s", JACKIE_CONNECT, n.ID, n.Config.NodePort))
-	return Send(fmt.Sprintf("%s:%s", host, port), message)
+func (n *Node) Connect(peer *PeerJackie) error {
+	message := fmt.Sprintf("%s %s %s", n.ID, "0.0.0.0", n.Config.NodePort)
+	return SendJackieRequest(peer.GetAddr(), JACKIE_CONNECT, message)
 }
 
 func (n *Node) ConnectOK(key string) error {
@@ -284,12 +284,12 @@ func (n *Node) CommitTxApproved(jury string, tx *blockchain.Transaction) error {
 	return nil
 }
 
-func (n *Node) RequestDownloadBlockchain(host, port string) error {
+func (n *Node) RequestDownloadBlockchain(peer *PeerJackie) error {
 	mu.Lock()
 	defer mu.Unlock()
 
 	message := fmt.Sprintf("%s", n.ID)
-	addr := fmt.Sprintf("%s:%s", host, port)
+	addr := peer.GetAddr()
 	if err := SendJackieRequest(addr, JACKIE_DOWNLOAD_BLOACKCHAIN, message); err != nil {
 		return err
 	}

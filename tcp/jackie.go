@@ -3,7 +3,10 @@ package tcp
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -18,6 +21,42 @@ const (
 	JACKIE_DISCONNECT              = "DISCONNECT"
 	JACKIE_MESSAGE                 = "MESSAGE"
 )
+
+type PeerJackie struct {
+	ID   string `json:"id"`
+	Host string `json:"host"`
+	Port string `json:"port"`
+}
+
+func (pj *PeerJackie) GetAddr() string {
+	return fmt.Sprintf("%s:%s", pj.Host, pj.Port)
+}
+
+func NewPeerJackie(addr string) *PeerJackie {
+	id := uuid.NewString()
+	host := "0.0.0.0"
+	port := ""
+
+	addrspl := strings.Split(addr, ":")
+	if len(addrspl) == 0 {
+		panic("invalid peer jackie address")
+	}
+
+	if len(addrspl) == 1 {
+		port = addrspl[0]
+	}
+
+	if len(addrspl) == 2 {
+		host = addrspl[0]
+		port = addrspl[1]
+	}
+
+	return &PeerJackie{
+		ID:   id,
+		Host: host,
+		Port: port,
+	}
+}
 
 func ParseJackieRequest(b *bytes.Buffer) (string, []string, error) {
 	message := strings.Split(b.String(), " ")

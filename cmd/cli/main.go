@@ -24,15 +24,17 @@ import (
 )
 
 var (
-	peer    string
+	connect string
 	port    string
 	verbose bool
 )
 
 var mu sync.Mutex
 
+var peer *tcp.PeerJackie
+
 func init() {
-	flag.StringVar(&peer, "peer", "", "set peer")
+	flag.StringVar(&connect, "connect", "", "set connection")
 	flag.StringVar(&port, "port", "3000", "set port")
 	flag.BoolVar(&verbose, "verbose", false, "set verbose")
 }
@@ -160,10 +162,10 @@ func main() {
 				isChainNil := node.Chain == nil
 				mu.Unlock()
 
-				if isChainNil && peer != "" {
-					log.Println("Downloading blockchain from", fmt.Sprintf("0.0.0.0:%s", peer))
+				if isChainNil && peer != nil {
+					log.Println("Downloading blockchain from", peer.GetAddr())
 
-					if err := node.RequestDownloadBlockchain("0.0.0.0", peer); err != nil {
+					if err := node.RequestDownloadBlockchain(peer); err != nil {
 						return err
 					}
 				}
@@ -345,8 +347,9 @@ func main() {
 	log.Println("Node ID:", node.ID)
 	log.Println("Node is running at", node.Config.NodePort)
 
-	if peer != "" {
-		if err := node.Connect("0.0.0.0", peer); err != nil {
+	if connect != "" {
+		peer = tcp.NewPeerJackie(connect)
+		if err := node.Connect(peer); err != nil {
 			panic(err)
 		}
 
