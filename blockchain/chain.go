@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/guiferpa/jackiechain/wallet"
 )
@@ -14,10 +13,9 @@ type Chain struct {
 	PendingTransactions Transactions `json:"pending_transactions"`
 	MiningDifficulty    int          `json:"mining_difficulty"`
 	MiningReward        int64        `json:"mining_reward"`
-	MiningTicker        int64        `json:"mining_ticker"`
 }
 
-func (c *Chain) MinePendingTransactions(minerAddr string) string {
+func (c *Chain) MineBlock(minerAddr string) string {
 	block := NewBlock(c.PendingTransactions)
 
 	got := strings.Repeat("0", c.MiningDifficulty)
@@ -64,7 +62,6 @@ func (c *Chain) AddTransaction(tx *Transaction) error {
 type ChainOptions struct {
 	MiningDifficulty    int
 	MiningReward        int64
-	MiningTicker        time.Duration
 	PendingTransactions Transactions
 }
 
@@ -78,7 +75,6 @@ func NewChain(opts ChainOptions) *Chain {
 	return &Chain{
 		MiningDifficulty:    opts.MiningDifficulty,
 		MiningReward:        opts.MiningReward,
-		MiningTicker:        int64(opts.MiningTicker),
 		PendingTransactions: pendingTransactions,
 		Blocks:              make([]Block, 0),
 	}

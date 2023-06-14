@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -39,10 +40,11 @@ type Node struct {
 }
 
 type NodeStats struct {
-	ID       string        `json:"id"`
-	Uptime   time.Duration `json:"uptime"`
-	Peers    []PeerJackie  `json:"peers"`
-	NodePort string        `json:"node_port"`
+	ID           string        `json:"id"`
+	Uptime       time.Duration `json:"uptime"`
+	Peers        []PeerJackie  `json:"peers"`
+	NodePort     string        `json:"node_port"`
+	MiningTicker time.Duration `json:"mining_ticker"`
 }
 
 func read(ln net.Listener, handler NodeHandler, verbose bool) error {
@@ -54,7 +56,7 @@ func read(ln net.Listener, handler NodeHandler, verbose bool) error {
 			return err
 		}
 
-		if err := handler(conn, verbose); err != nil {
+		if err := handler(conn, verbose); err != nil && err != io.EOF {
 			log.Println(red(err))
 		}
 	}
@@ -79,17 +81,17 @@ func write(n *Node) {
 	}
 }
 
-func (n *Node) Mine() {
-	ticker := time.NewTicker(time.Second * 2)
+func (n *Node) MineBlock() {
+	mu.Lock()
+	ticker := time.NewTicker(n.Config.MiningTicker)
+	mu.Unlock()
 
 	for range ticker.C {
 		mu.Lock()
 		if n.Chain != nil {
 			if len(n.Chain.PendingTransactions) > 0 {
-				log.Println("Start mining")
-				h := n.Chain.MinePendingTransactions(n.WalletAddress)
+				h := n.Chain.MineBlock(n.Config.WalletAddress)
 				log.Println("Block", h, "was mined")
-				log.Println("End mining")
 			}
 		}
 		mu.Unlock()
@@ -211,6 +213,14 @@ func (n *Node) RequestTxApprobation(tx blockchain.Transaction) error {
 
 	if n.unconfirmedTxs == nil {
 		n.unconfirmedTxs = make(map[string][]string)
+	}
+
+	if len(n.unconfirmedTxs) == 0 {
+		if err := n.Chain.AddTransaction(&tx); err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	txmsg, err := json.Marshal(tx)
@@ -390,16 +400,16 @@ func (n *Node) Stats() NodeStats {
 type NodeConfig struct {
 	NodePort      string
 	Verbose       bool
+	MiningTicker  time.Duration
 	WalletAddress string
 }
 
 func NewNode(config NodeConfig, chain *blockchain.Chain) *Node {
 	return &Node{
-		ID:            uuid.NewString(),
-		UpAt:          time.Now(),
-		Chain:         chain,
-		WalletAddress: config.WalletAddress,
-		peers:         make(map[string]*PeerJackie, 0),
-		Config:        config,
+		ID:     uuid.NewString(),
+		UpAt:   time.Now(),
+		Chain:  chain,
+		peers:  make(map[string]*PeerJackie, 0),
+		Config: config,
 	}
 }

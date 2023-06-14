@@ -50,16 +50,16 @@ func main() {
 		panic(errors.New("invalid wallet"))
 	}
 
-	nodecfg := tcp.NodeConfig{
-		NodePort: port,
-		Verbose:  verbose,
-	}
 	chain := blockchain.NewChain(blockchain.ChainOptions{
 		MiningDifficulty: 2,
 		MiningReward:     10,
-		MiningTicker:     2 * time.Minute,
 	})
-	node := tcp.NewNode(nodecfg, chain)
+	node := tcp.NewNode(tcp.NodeConfig{
+		NodePort:      port,
+		Verbose:       verbose,
+		WalletAddress: walletAddr,
+		MiningTicker:  2 * time.Minute,
+	}, chain)
 
 	node.SetHandler(func(conn net.Conn, verbose bool) error {
 		defer conn.Close()
@@ -369,7 +369,7 @@ func main() {
 		mu.Unlock()
 	}
 
-	go node.Mine()
+	go node.MineBlock()
 
 	<-sigc
 }
