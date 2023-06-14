@@ -132,7 +132,13 @@ func (n *Node) ShareConnectionState(peer *PeerJackie) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	message := fmt.Sprintf("%s %s %s", n.ID, "0.0.0.0", n.Config.NodePort)
+	conn, err := net.Dial("udp", peer.GetAddr())
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	message := fmt.Sprintf("%s %s %s", n.ID, conn.LocalAddr().(*net.UDPAddr).IP, n.Config.NodePort)
 	if err := SendJackieRequest(peer, JACKIE_CONNECT_LOOPBACK, message); err != nil {
 		return err
 	}
@@ -148,7 +154,14 @@ func (n *Node) ShareConnectionState(peer *PeerJackie) error {
 }
 
 func (n *Node) Connect(peer *PeerJackie) error {
-	message := fmt.Sprintf("%s %s %s", n.ID, "0.0.0.0", n.Config.NodePort)
+	conn, err := net.Dial("udp", peer.GetAddr())
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	addr := conn.LocalAddr().(*net.UDPAddr)
+	message := fmt.Sprintf("%s %s %s", n.ID, addr.IP, n.Config.NodePort)
 	return SendJackieRequest(peer, JACKIE_CONNECT, message)
 }
 
@@ -215,7 +228,7 @@ func (n *Node) RequestTxApprobation(tx blockchain.Transaction) error {
 		n.unconfirmedTxs = make(map[string][]string)
 	}
 
-	if len(n.unconfirmedTxs) == 0 {
+	if len(n.peers) == 0 {
 		if err := n.Chain.AddTransaction(&tx); err != nil {
 			return err
 		}
