@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func newHTTPResponse(req *http.Request, statusCode int, header http.Header, body *bytes.Buffer) *http.Response {
+func NewHTTPResponse(req *http.Request, statusCode int, header http.Header, body *bytes.Buffer) *http.Response {
 	var rdb io.ReadCloser = http.NoBody
 	contentLength := 0
 
@@ -38,7 +38,7 @@ func Response(r *http.Request, w io.Writer, statusCode int, body *bytes.Buffer) 
 	header.Set("Date", time.Now().Format(time.RFC1123))
 	header.Set("Access-Control-Allow-Origin", "*")
 
-	resp := newHTTPResponse(r, statusCode, header, body)
+	resp := NewHTTPResponse(r, statusCode, header, body)
 
 	bs := &bytes.Buffer{}
 	if err := resp.Write(bs); err != nil {
