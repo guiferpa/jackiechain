@@ -34,15 +34,15 @@ func (ts Transactions) String() string {
 }
 
 type Transaction struct {
-	Signature []byte `json:"signature"`
-	Sender    string `json:"sender"`
-	Receiver  string `json:"receiver"`
-	Amount    int64  `json:"amount"`
-	Timestamp int64  `json:"timestamp"`
+	Signature []byte              `json:"signature"`
+	Sender    *wallet.Wallet      `json:"sender"`
+	Inputs    []TransactionInput  `json:"inputs"`
+	Outputs   []TransactionOutput `json:"outputs"`
+	Timestamp int64               `json:"timestamp"`
 }
 
 func (t *Transaction) CalculateHash() string {
-	payload := fmt.Sprintf("%s::%s::%v::%v", t.Sender, t.Receiver, t.Amount, t.Timestamp)
+	payload := fmt.Sprintf("%s::%s::%v::%v", t.Timestamp)
 	h := sha256.New()
 	h.Write([]byte(payload))
 	return hex.EncodeToString(h.Sum(nil))
@@ -57,7 +57,11 @@ func (t *Transaction) Sign(privKey ed25519.PrivateKey) {
 }
 
 func (t *Transaction) HasValidSignature() (bool, error) {
-	b, err := base58.Decode(t.Sender)
+	if len(t.Inputs) == 0 {
+		return true, nil
+	}
+
+	b, err := base58.Decode(t.Sender.GetAddress())
 	if err != nil {
 		return false, err
 	}
@@ -68,16 +72,16 @@ func (t *Transaction) HasValidSignature() (bool, error) {
 }
 
 type TransactionOptions struct {
-	Sender       wallet.Wallet
-	ReceiverAddr string
-	Amount       int64
+	Sender  *wallet.Wallet
+	Inputs  []TransactionInput
+	Outputs []TransactionOutput
 }
 
 func NewTransaction(opts TransactionOptions) *Transaction {
 	return &Transaction{
-		Sender:    opts.Sender.GetAddress(),
-		Receiver:  opts.ReceiverAddr,
-		Amount:    opts.Amount,
+		Sender:    opts.Sender,
+		Inputs:    opts.Inputs,
+		Outputs:   opts.Outputs,
 		Timestamp: time.Now().UnixNano(),
 	}
 }
@@ -86,4 +90,14 @@ func NewSignedTransaction(opts TransactionOptions) *Transaction {
 	t := NewTransaction(opts)
 	t.Sign(opts.Sender.PrivateKey)
 	return t
+}
+
+type CoinbaseTransactionOptions struct {
+	Outputs []TransactionOutput
+}
+
+func NewCoinbaseTransaction(opts CoinbaseTransactionOptions) *Transaction {
+	return NewTransaction(TransactionOptions{
+		Outputs: opts.Outputs,
+	})
 }

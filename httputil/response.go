@@ -62,3 +62,8 @@ func ResponseBadRequest(r *http.Request, w io.Writer, message string) error {
 	body := fmt.Sprintf("{\"message\": \"%s\"}", message)
 	return Response(r, w, http.StatusBadRequest, bytes.NewBufferString(body))
 }
+
+func ResponseMethodNotAllowed(r *http.Request, w io.Writer) error {
+	body := "{\"message\": \"Method not allowed\"}"
+	return Response(r, w, http.StatusMethodNotAllowed, bytes.NewBufferString(body))
+}

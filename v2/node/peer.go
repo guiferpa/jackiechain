@@ -154,10 +154,16 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, port, action string, args
 	return errors.New("Invalid jackie action")
 }
 
-func HTTPHandler(conn net.Conn, req *http.Request) error {
+func HTTPHandler(chain *blockchain.Chain, conn net.Conn, req *http.Request) error {
 	defer conn.Close()
 
-	return httputil.Response(req, conn, http.StatusNoContent, nil)
+	if req.Method == http.MethodPost {
+		if req.URL.Path == "/tx" {
+			return CreateTxHandler(*chain, conn, req)
+		}
+	}
+
+	return httputil.ResponseNotFound(req, conn)
 }
 
 func NewService(port string) *Service {

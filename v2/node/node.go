@@ -47,7 +47,7 @@ func Listen(port string, verbose bool, peer Peer, chain *blockchain.Chain) error
 		reader := bufio.NewReader(bytes.NewBuffer(buf.Bytes()))
 
 		if req, err := http.ReadRequest(reader); err == nil {
-			if err := HTTPHandler(conn, req); err != nil {
+			if err := HTTPHandler(chain, conn, req); err != nil {
 				logger.Red(err)
 			}
 		} else {
@@ -68,10 +68,8 @@ func MineNewBlock(wallet string, chain *blockchain.Chain) {
 	for range ticker.C {
 		mu.Lock()
 
-		bhash := chain.MineBlock(wallet)
+		log.Println("Block", chain.MineBlock(wallet), "mined")
 
 		mu.Unlock()
-
-		log.Println("Block", bhash, "mined")
 	}
 }

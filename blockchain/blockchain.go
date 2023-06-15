@@ -1,5 +1,0 @@
-package blockchain
-
-func NewBlockchain() {
-
-}
