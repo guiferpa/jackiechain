@@ -42,11 +42,7 @@ func main() {
 	sigc := make(chan os.Signal)
 	signal.Notify(sigc, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 
-	go func() {
-		if err := node.Listen(port, verbose, peer, chain); err != nil {
-			panic(err)
-		}
-	}()
+	go node.Listen(port, verbose, peer, chain)
 
 	log.Println("Node is running at", port)
 

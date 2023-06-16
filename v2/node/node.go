@@ -17,18 +17,18 @@ import (
 
 const MAX_CHUNK_SIZE = 1024
 
-func Listen(port string, verbose bool, peer Peer, chain *blockchain.Chain) error {
+func Listen(port string, verbose bool, peer Peer, chain *blockchain.Chain) {
 	upat := time.Now()
 
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			return err
+			panic(err)
 		}
 
 		bs := make([]byte, MAX_CHUNK_SIZE)
@@ -37,7 +37,8 @@ func Listen(port string, verbose bool, peer Peer, chain *blockchain.Chain) error
 			continue
 		}
 		if err != nil {
-			return err
+			logger.Red(err)
+			continue
 		}
 
 		buf := bytes.NewBuffer(bs)
