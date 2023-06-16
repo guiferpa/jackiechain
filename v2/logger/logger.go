@@ -13,3 +13,7 @@ func Red(a ...interface{}) {
 func Yellow(a ...interface{}) {
 	log.Println(color.New(color.BgBlack, color.FgHiYellow).Sprint(a...))
 }
+
+func Magenta(a ...interface{}) {
+	log.Println(color.New(color.BgBlack, color.FgHiMagenta).Sprint(a...))
+}

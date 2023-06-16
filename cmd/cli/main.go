@@ -11,25 +11,41 @@ import (
 	"time"
 
 	"github.com/guiferpa/jackiechain/blockchain"
+	"github.com/guiferpa/jackiechain/v2/logger"
 	"github.com/guiferpa/jackiechain/v2/node"
+	"github.com/guiferpa/jackiechain/wallet"
 )
 
 var (
-	connect    string
-	port       string
-	verbose    bool
-	walletAddr string
+	connect string
+	port    string
+	verbose bool
+	miner   string
 )
 
 func init() {
 	flag.StringVar(&connect, "connect", "", "set connection")
 	flag.StringVar(&port, "port", "3000", "set port")
 	flag.BoolVar(&verbose, "verbose", false, "set verbose")
-	flag.StringVar(&walletAddr, "wallet", "", "set wallet address")
+	flag.StringVar(&miner, "wallet", "", "set miner wallet address")
 }
 
 func main() {
 	flag.Parse()
+
+	if miner == "" {
+		logger.Magenta("Miner wallet flag is empty, by default jackie will created new one")
+
+		w, err := wallet.NewWallet()
+		if err != nil {
+			panic(err)
+		}
+
+		log.Println("Wallet address:", w.GetAddress())
+		log.Println("Wallet private seed:", w.GetPrivateSeed())
+
+		miner = w.GetAddress()
+	}
 
 	chain := blockchain.NewChain(blockchain.ChainOptions{
 		MiningDifficulty: 2,
@@ -58,8 +74,8 @@ func main() {
 		}
 	}
 
-	miningTicker := time.NewTicker(1 * time.Minute)
-	go node.MineNewBlock(walletAddr, chain, miningTicker)
+	miningTicker := time.NewTicker(2 * time.Minute)
+	go node.MineNewBlock(miner, chain, miningTicker)
 
 	<-sigc
 

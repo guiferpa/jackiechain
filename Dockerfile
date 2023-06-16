@@ -10,4 +10,4 @@ FROM scratch
 
 COPY --from=builder /opt/jackie/jackie /usr/bin/jackie
 
-CMD ["jackie"]
+ENTRYPOINT ["jackie"]
