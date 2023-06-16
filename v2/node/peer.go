@@ -39,11 +39,13 @@ func (s *Service) GetID() string {
 }
 
 func (s *Service) SetNeighbor(id, addr string) error {
+	id = strings.Trim(id, "\x00")
+
 	if _, exists := s.neighborhood[id]; exists {
 		return errors.New("duplicated peer")
 	}
 
-	s.neighborhood[id] = addr
+	s.neighborhood[id] = strings.Trim(addr, "\x00")
 
 	return nil
 }
@@ -154,8 +156,6 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port, act
 	}
 
 	return errors.New("Invalid jackie action")
-
-	return nil
 }
 
 func HTTPHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port string, conn net.Conn, req *http.Request) error {
@@ -163,21 +163,29 @@ func HTTPHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port string
 
 	if req.Method == http.MethodGet {
 		if req.URL.Path == "/transactions" {
-			return ListTxsHandler(*chain, conn, req)
+			return ListTxsHTTPHandler(*chain, conn, req)
 		}
 
 		if req.URL.Path == "/blocks" {
-			return ListBlocksHandler(*chain, conn, req)
+			return ListBlocksHTTPHandler(*chain, conn, req)
 		}
 
 		if req.URL.Path == "/info" {
-			return GetPeerInfoHandler(upat, port, peer, conn, req)
+			return GetPeerInfoHTTPHandler(upat, port, peer, conn, req)
+		}
+
+		if req.URL.Path == "/wallets" {
+
 		}
 	}
 
 	if req.Method == http.MethodPost {
 		if req.URL.Path == "/transactions" {
-			return CreateTxHandler(chain, conn, req)
+			return CreateTxHTTPHandler(chain, conn, req)
+		}
+
+		if req.URL.Path == "/wallets" {
+			return CreateWalletHTTPHandler(conn, req)
 		}
 	}
 

@@ -12,18 +12,18 @@ import (
 	"github.com/guiferpa/jackiechain/wallet"
 )
 
-type CreateTxRequestBody struct {
+type CreateTxHTTPRequestBody struct {
 	Sender      string `json:"sender"`
 	Receiver    string `json:"receiver"`
 	PrivateSeed string `json:"private_seed"`
 	Amount      int    `json:"amount"`
 }
 
-func CreateTxHandler(chain *blockchain.Chain, conn net.Conn, req *http.Request) error {
+func CreateTxHTTPHandler(chain *blockchain.Chain, conn net.Conn, req *http.Request) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	body := CreateTxRequestBody{}
+	body := CreateTxHTTPRequestBody{}
 	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 		return httputil.ResponseBadRequest(req, conn, err.Error())
 	}
@@ -69,7 +69,7 @@ func CreateTxHandler(chain *blockchain.Chain, conn net.Conn, req *http.Request) 
 	return httputil.Response(req, conn, http.StatusNoContent, nil)
 }
 
-func ListTxsHandler(chain blockchain.Chain, conn net.Conn, req *http.Request) error {
+func ListTxsHTTPHandler(chain blockchain.Chain, conn net.Conn, req *http.Request) error {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -90,7 +90,7 @@ type ListBlockInfo struct {
 
 type ListBlockResponseBody []ListBlockInfo
 
-func ListBlocksHandler(chain blockchain.Chain, conn net.Conn, req *http.Request) error {
+func ListBlocksHTTPHandler(chain blockchain.Chain, conn net.Conn, req *http.Request) error {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -116,14 +116,15 @@ type PeerInfo struct {
 	Addr string `json:"address"`
 }
 
-type GetPeerInfoResponseBody struct {
-	ID       string        `json:"id"`
-	Uptime   time.Duration `json:"uptime"`
-	Peers    []PeerInfo    `json:"peers"`
-	NodePort string        `json:"node_port"`
+type GetPeerInfoHTTPResponseBody struct {
+	ID          string        `json:"id"`
+	Uptime      time.Duration `json:"uptime"`
+	Peers       []PeerInfo    `json:"peers"`
+	NodePort    string        `json:"node_port"`
+	MiningClock string        `json:"mining_clock"`
 }
 
-func GetPeerInfoHandler(upat time.Time, port string, peer Peer, conn net.Conn, req *http.Request) error {
+func GetPeerInfoHTTPHandler(upat time.Time, port string, peer Peer, conn net.Conn, req *http.Request) error {
 	uptime := time.Now().Sub(upat)
 
 	peers := make([]PeerInfo, 0)
@@ -131,11 +132,12 @@ func GetPeerInfoHandler(upat time.Time, port string, peer Peer, conn net.Conn, r
 		peers = append(peers, PeerInfo{ID: id, Addr: addr})
 	}
 
-	body := GetPeerInfoResponseBody{
-		ID:       peer.GetID(),
-		NodePort: port,
-		Peers:    peers,
-		Uptime:   time.Duration(uptime / time.Second),
+	body := GetPeerInfoHTTPResponseBody{
+		ID:          peer.GetID(),
+		NodePort:    port,
+		Peers:       peers,
+		Uptime:      time.Duration(uptime / time.Second),
+		MiningClock: "",
 	}
 
 	buf := new(bytes.Buffer)
@@ -144,4 +146,28 @@ func GetPeerInfoHandler(upat time.Time, port string, peer Peer, conn net.Conn, r
 	}
 
 	return httputil.Response(req, conn, http.StatusOK, buf)
+}
+
+type CreateWalletHTTPResponseBody struct {
+	Address     string `json:"address"`
+	PrivateSeed string `json:"private_seed"`
+}
+
+func CreateWalletHTTPHandler(conn net.Conn, req *http.Request) error {
+	w, err := wallet.NewWallet()
+	if err != nil {
+		return httputil.ResponseBadRequest(req, conn, err.Error())
+	}
+
+	body := CreateWalletHTTPResponseBody{
+		Address:     w.GetAddress(),
+		PrivateSeed: w.GetPrivateSeed(),
+	}
+
+	buf := new(bytes.Buffer)
+	if err := json.NewEncoder(buf).Encode(&body); err != nil {
+		return httputil.ResponseBadRequest(req, conn, err.Error())
+	}
+
+	return httputil.Response(req, conn, http.StatusCreated, buf)
 }
