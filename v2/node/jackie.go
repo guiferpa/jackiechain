@@ -22,6 +22,17 @@ const (
 	JACKIE_DISCONNECT              = "DISCONNECT"
 )
 
+type JackieDuplicatedPeerError struct {
+	PeerId   string
+	PeerAddr string
+}
+
+func (err *JackieDuplicatedPeerError) Error() string {
+	return "duplicated peer"
+}
+
+var ErrJackieDuplcatedPeer = &JackieDuplicatedPeerError{}
+
 func Send(addr, action string, args []string) error {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -58,13 +69,13 @@ func PeerDisconnect(id, to string) error {
 	return Send(to, JACKIE_DISCONNECT, args)
 }
 
-func TxApprobationRequest(peer Peer, tx blockchain.Transaction, to string) error {
+func TxApprobationRequest(id string, tx blockchain.Transaction, to string) error {
 	bs, err := json.Marshal(tx)
 	if err != nil {
 		return err
 	}
 
-	args := []string{peer.GetID(), base64.StdEncoding.EncodeToString(bs)}
+	args := []string{id, base64.StdEncoding.EncodeToString(bs)}
 	return Send(to, JACKIE_TX_APPROBATION, args)
 }
 

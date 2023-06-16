@@ -19,7 +19,7 @@ type CreateTxHTTPRequestBody struct {
 	Amount      int    `json:"amount"`
 }
 
-func CreateTxHTTPHandler(chain *blockchain.Chain, conn net.Conn, req *http.Request) error {
+func CreateTxHTTPHandler(peer Peer, chain *blockchain.Chain, conn net.Conn, req *http.Request) error {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -65,6 +65,11 @@ func CreateTxHTTPHandler(chain *blockchain.Chain, conn net.Conn, req *http.Reque
 	})
 
 	chain.AddPendingTransaction(*tx)
+
+	for _, neighbor := range peer.GetNeighborhood() {
+		// Ignore net failure
+		TxApprobationRequest(peer.GetID(), *tx, neighbor)
+	}
 
 	return httputil.Response(req, conn, http.StatusNoContent, nil)
 }

@@ -40,12 +40,15 @@ func (s *Service) GetID() string {
 
 func (s *Service) SetNeighbor(id, addr string) error {
 	id = strings.Trim(id, "\x00")
+	addr = strings.Trim(addr, "\x00")
 
 	if _, exists := s.neighborhood[id]; exists {
-		return errors.New("duplicated peer")
+		ErrJackieDuplcatedPeer.PeerId = id
+		ErrJackieDuplcatedPeer.PeerAddr = addr
+		return ErrJackieDuplcatedPeer
 	}
 
-	s.neighborhood[id] = strings.Trim(addr, "\x00")
+	s.neighborhood[id] = addr
 
 	return nil
 }
@@ -79,7 +82,7 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port, act
 		}
 
 		if err := peer.SetNeighbor(args[0], args[1]); err != nil {
-			if err.Error() == "duplicated peer" {
+			if errors.Is(err, ErrJackieDuplcatedPeer) {
 				return nil
 			}
 			return err
@@ -93,7 +96,7 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port, act
 	// CONNECT_LOOPBACK <peer-id> <peer-addr>
 	if action == JACKIE_CONNECT_LOOPBACK {
 		if err := peer.SetNeighbor(args[0], args[1]); err != nil {
-			if err.Error() == "duplicated peer" {
+			if errors.Is(err, ErrJackieDuplcatedPeer) {
 				return nil
 			}
 			return err
@@ -144,14 +147,34 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port, act
 		}
 
 		cchain := new(blockchain.Chain)
-		err = json.NewDecoder(bytes.NewBuffer(bs)).Decode(chain)
+		if err = json.NewDecoder(bytes.NewBuffer(bs)).Decode(chain); err != nil {
+			return err
+		}
+
 		chain = cchain
 
+		log.Println("Blockchain downloaded successful with size equals", len(bs), "bytes")
+		return nil
+	}
+
+	// TX_APPROBATION <peer-id> <tx-encoded-b64>
+	if action == JACKIE_TX_APPROBATION {
+		raw := strings.Trim(args[1], "\x00")
+
+		bs, err := base64.StdEncoding.DecodeString(raw)
 		if err != nil {
 			return err
 		}
 
-		log.Println("Blockchain downloaded successful with size equals", len(bs), "bytes")
+		tx := blockchain.Transaction{}
+		if err := json.NewDecoder(bytes.NewBuffer(bs)).Decode(&tx); err != nil {
+			return err
+		}
+
+		chain.AddPendingTransaction(tx)
+
+		log.Println("Tx", tx.CalculateHash(), "received from peer", args[0])
+
 		return nil
 	}
 
@@ -173,15 +196,11 @@ func HTTPHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port string
 		if req.URL.Path == "/info" {
 			return GetPeerInfoHTTPHandler(upat, port, peer, conn, req)
 		}
-
-		if req.URL.Path == "/wallets" {
-
-		}
 	}
 
 	if req.Method == http.MethodPost {
 		if req.URL.Path == "/transactions" {
-			return CreateTxHTTPHandler(chain, conn, req)
+			return CreateTxHTTPHandler(peer, chain, conn, req)
 		}
 
 		if req.URL.Path == "/wallets" {
