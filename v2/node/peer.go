@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -195,6 +196,12 @@ func HTTPHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port string
 
 		if req.URL.Path == "/info" {
 			return GetPeerInfoHTTPHandler(upat, port, peer, conn, req)
+		}
+
+		rg := regexp.MustCompile(`(/wallets/).+`)
+		if matched := rg.MatchString(req.URL.Path); matched {
+			parts := strings.Split(req.URL.Path, "/")
+			return GetWalletBySeedHTTPHandler(parts[2], conn, req)
 		}
 	}
 

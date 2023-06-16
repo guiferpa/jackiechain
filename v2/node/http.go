@@ -176,3 +176,24 @@ func CreateWalletHTTPHandler(conn net.Conn, req *http.Request) error {
 
 	return httputil.Response(req, conn, http.StatusCreated, buf)
 }
+
+type GetWalletHTTPResponseBody CreateWalletHTTPResponseBody
+
+func GetWalletBySeedHTTPHandler(seed string, conn net.Conn, req *http.Request) error {
+	w, err := wallet.ParseWallet(seed)
+	if err != nil {
+		return httputil.ResponseBadRequest(req, conn, err.Error())
+	}
+
+	body := GetWalletHTTPResponseBody{
+		Address:     w.GetAddress(),
+		PrivateSeed: w.GetPrivateSeed(),
+	}
+
+	buf := new(bytes.Buffer)
+	if err := json.NewEncoder(buf).Encode(body); err != nil {
+		return httputil.ResponseBadRequest(req, conn, err.Error())
+	}
+
+	return httputil.Response(req, conn, http.StatusOK, buf)
+}
