@@ -1,6 +1,9 @@
 package blockchain
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type Chain struct {
 	Blocks              []Block
@@ -29,8 +32,8 @@ func (c *Chain) AddPendingTransaction(tx Transaction) {
 func (c *Chain) MineBlock(miner string) string {
 	ptxs := c.PendingTransactions
 
-	previousBlock := c.GetLatestBlockFromChain()
-	candidateBlock := NewBlock(CalculateBlockHash(previousBlock), ptxs)
+	previousBlockHash := c.GetLatestBlockHash()
+	candidateBlock := NewBlock(previousBlockHash, ptxs)
 	candidateBlock.Mine(c.MiningDifficulty, miner)
 
 	c.Transactions = append(c.Transactions, ptxs...)
@@ -51,8 +54,12 @@ func (c *Chain) MineBlock(miner string) string {
 	return CalculateBlockHash(*candidateBlock)
 }
 
-func (c *Chain) GetLatestBlockFromChain() Block {
-	return c.Blocks[len(c.Blocks)-1]
+func (c *Chain) GetLatestBlockHash() string {
+	if len(c.Blocks) == 0 {
+		return strings.Repeat("0", 64)
+	}
+
+	return CalculateBlockHash(c.Blocks[len(c.Blocks)-1])
 }
 
 type ChainOptions struct {

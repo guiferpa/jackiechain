@@ -203,6 +203,12 @@ func HTTPHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port string
 			parts := strings.Split(req.URL.Path, "/")
 			return GetWalletBySeedHTTPHandler(parts[2], conn, req)
 		}
+
+		rg = regexp.MustCompile(`(/balance/).+`)
+		if matched := rg.MatchString(req.URL.Path); matched {
+			parts := strings.Split(req.URL.Path, "/")
+			return GetBalanceByWalletAddress(parts[2], *chain, conn, req)
+		}
 	}
 
 	if req.Method == http.MethodPost {

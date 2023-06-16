@@ -37,7 +37,7 @@ func CreateTxHTTPHandler(peer Peer, chain *blockchain.Chain, conn net.Conn, req 
 		return httputil.ResponseBadRequest(req, conn, "seed is wrong for your wallet")
 	}
 
-	inputs, err := blockchain.GetUTXOsByWalletAddress(*chain, *w)
+	inputs, err := blockchain.GetUTXOsByWalletAddress(*chain, w.GetAddress())
 	if err != nil {
 		return httputil.ResponseBadRequest(req, conn, err.Error())
 	}
@@ -192,6 +192,35 @@ func GetWalletBySeedHTTPHandler(seed string, conn net.Conn, req *http.Request) e
 
 	buf := new(bytes.Buffer)
 	if err := json.NewEncoder(buf).Encode(body); err != nil {
+		return httputil.ResponseBadRequest(req, conn, err.Error())
+	}
+
+	return httputil.Response(req, conn, http.StatusOK, buf)
+}
+
+type GetBalanceByWalletAddressHTTPResponseBody struct {
+	Date    string `json:"date"`
+	Balance int    `json:"balance"`
+}
+
+func GetBalanceByWalletAddress(addr string, chain blockchain.Chain, conn net.Conn, req *http.Request) error {
+	txs, err := blockchain.GetUTXOsByWalletAddress(chain, addr)
+	if err != nil {
+		return httputil.ResponseBadRequest(req, conn, err.Error())
+	}
+
+	balance := 0
+	for _, tx := range txs {
+		balance += tx.Amount
+	}
+
+	body := GetBalanceByWalletAddressHTTPResponseBody{
+		Balance: balance,
+		Date:    time.Now().Format(time.RFC3339),
+	}
+
+	buf := new(bytes.Buffer)
+	if err := json.NewEncoder(buf).Encode(&body); err != nil {
 		return httputil.ResponseBadRequest(req, conn, err.Error())
 	}
 
