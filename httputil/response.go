@@ -54,7 +54,7 @@ func Response(r *http.Request, w io.Writer, statusCode int, body *bytes.Buffer) 
 }
 
 func ResponseNotFound(r *http.Request, w io.Writer) error {
-	body := "{\"message\": \"Not found\"}"
+	body := "{\"message\": \"not found\"}"
 	return Response(r, w, http.StatusNotFound, bytes.NewBufferString(body))
 }
 
@@ -64,6 +64,6 @@ func ResponseBadRequest(r *http.Request, w io.Writer, message string) error {
 }
 
 func ResponseMethodNotAllowed(r *http.Request, w io.Writer) error {
-	body := "{\"message\": \"Method not allowed\"}"
+	body := "{\"message\": \"method not allowed\"}"
 	return Response(r, w, http.StatusMethodNotAllowed, bytes.NewBufferString(body))
 }

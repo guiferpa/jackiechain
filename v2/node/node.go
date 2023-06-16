@@ -18,6 +18,8 @@ import (
 const MAX_CHUNK_SIZE = 1024
 
 func Listen(port string, verbose bool, peer Peer, chain *blockchain.Chain) error {
+	upat := time.Now()
+
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		return err
@@ -47,7 +49,7 @@ func Listen(port string, verbose bool, peer Peer, chain *blockchain.Chain) error
 		reader := bufio.NewReader(bytes.NewBuffer(buf.Bytes()))
 
 		if req, err := http.ReadRequest(reader); err == nil {
-			if err := HTTPHandler(chain, conn, req); err != nil {
+			if err := HTTPHandler(peer, chain, upat, port, conn, req); err != nil {
 				logger.Red(err)
 			}
 		} else {
@@ -55,21 +57,26 @@ func Listen(port string, verbose bool, peer Peer, chain *blockchain.Chain) error
 			if len(line) < 3 {
 				logger.Red("invalid protocol")
 			}
-			if err := JackieHandler(peer, chain, port, line[1], line[2:]); err != nil {
+			if err := JackieHandler(peer, chain, upat, port, line[1], line[2:]); err != nil {
 				logger.Red(err)
 			}
 		}
 	}
 }
 
-func MineNewBlock(wallet string, chain *blockchain.Chain) {
-	ticker := time.NewTicker(2 * time.Minute)
-
-	for range ticker.C {
+func MineNewBlock(wallet string, chain *blockchain.Chain, miningTicker *time.Ticker) {
+	for range miningTicker.C {
 		mu.Lock()
-
 		log.Println("Block", chain.MineBlock(wallet), "mined")
-
 		mu.Unlock()
+	}
+}
+
+func TerminatePeer(peer Peer) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	for _, neighbor := range peer.GetNeighborhood() {
+		PeerDisconnect(peer.GetID(), neighbor)
 	}
 }

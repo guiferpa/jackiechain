@@ -35,7 +35,7 @@ func (ts Transactions) String() string {
 
 type Transaction struct {
 	Signature []byte              `json:"signature"`
-	Sender    *wallet.Wallet      `json:"sender"`
+	Sender    *wallet.Wallet      `json:"-"`
 	Inputs    []TransactionInput  `json:"inputs"`
 	Outputs   []TransactionOutput `json:"outputs"`
 	Timestamp int64               `json:"timestamp"`
@@ -98,6 +98,7 @@ type CoinbaseTransactionOptions struct {
 
 func NewCoinbaseTransaction(opts CoinbaseTransactionOptions) *Transaction {
 	return NewTransaction(TransactionOptions{
+		Inputs:  make([]TransactionInput, 0),
 		Outputs: opts.Outputs,
 	})
 }

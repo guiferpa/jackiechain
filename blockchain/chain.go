@@ -1,18 +1,29 @@
 package blockchain
 
+import "fmt"
+
 type Chain struct {
 	Blocks              []Block
 	Transactions        Transactions
 	PendingTransactions Transactions
 	MiningDifficulty    int
 	MiningReward        int
-	UTXO                map[string][]TransactionOutput
+	UTXO                map[string]TransactionOutput
 }
 
-func (c *Chain) AddPendingTransaction(tx Transaction) error {
+func (c *Chain) AddPendingTransaction(tx Transaction) {
+	for _, txin := range tx.Inputs {
+		id := fmt.Sprintf("%s::%s", txin.TxOutputHash, txin.Sender)
+		delete(c.UTXO, id)
+	}
+
+	for _, txout := range tx.Outputs {
+		id := fmt.Sprintf("%s::%s", CalculateTxEntryHash(&txout), txout.Receiver)
+		c.UTXO[id] = txout
+	}
+
 	ptxs := c.PendingTransactions
 	c.PendingTransactions = append(ptxs, tx)
-	return nil
 }
 
 func (c *Chain) MineBlock(miner string) string {
@@ -23,13 +34,19 @@ func (c *Chain) MineBlock(miner string) string {
 	candidateBlock.Mine(c.MiningDifficulty, miner)
 
 	c.Transactions = append(c.Transactions, ptxs...)
+	c.PendingTransactions = []Transaction{}
+
+	c.Blocks = append(c.Blocks, *candidateBlock)
 
 	cbtx := NewCoinbaseTransaction(CoinbaseTransactionOptions{
 		Outputs: []TransactionOutput{
-			{Receiver: miner, Amount: c.MiningReward},
+			*NewTransactionOutput(TransactionOutputOptions{
+				Receiver: miner,
+				Amount:   c.MiningReward,
+			}),
 		},
 	})
-	c.PendingTransactions = []Transaction{*cbtx}
+	c.AddPendingTransaction(*cbtx)
 
 	return CalculateBlockHash(*candidateBlock)
 }
@@ -44,12 +61,14 @@ type ChainOptions struct {
 }
 
 func NewChain(opts ChainOptions) *Chain {
-	genesisBlock := Block{}
+	genesisBlock := NewBlock("", []Transaction{})
 
 	return &Chain{
 		MiningDifficulty:    opts.MiningDifficulty,
 		MiningReward:        opts.MiningReward,
 		PendingTransactions: make(Transactions, 0),
-		Blocks:              []Block{genesisBlock},
+		Transactions:        make(Transactions, 0),
+		UTXO:                make(map[string]TransactionOutput),
+		Blocks:              []Block{*genesisBlock},
 	}
 }

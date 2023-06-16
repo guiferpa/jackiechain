@@ -1,22 +1,18 @@
 package blockchain
 
-import (
-	"crypto/ed25519"
+import "github.com/guiferpa/jackiechain/wallet"
 
-	"github.com/mr-tron/base58"
-)
+func GetUTXOsByWalletAddress(chain Chain, w wallet.Wallet) ([]TransactionInput, error) {
+	addr := w.GetAddress()
 
-func GetUTXOsByWalletAddress(chain Chain, encseed string) ([]TransactionOutput, error) {
-	seed, err := base58.Decode(encseed)
-	if err != nil {
-		return nil, err
+	txs := make([]TransactionInput, 0)
+	for _, txout := range chain.UTXO {
+		txin := txout.ToInput()
+
+		if txin.Sender == addr {
+			txs = append(txs, *txin)
+		}
 	}
-
-	priv := ed25519.NewKeyFromSeed(seed)
-
-	addr := base58.Encode(priv.Public().(ed25519.PublicKey))
-
-	txs := chain.UTXO[addr]
 
 	return txs, nil
 }

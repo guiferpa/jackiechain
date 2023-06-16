@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -59,7 +60,10 @@ func (s *Service) GetNeighborhood() map[string]string {
 	return s.neighborhood
 }
 
-func JackieHandler(peer Peer, chain *blockchain.Chain, port, action string, args []string) error {
+func JackieHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port, action string, args []string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
 	// CONNECT <peer-id> <peer-addr>
 	if action == JACKIE_CONNECT {
 		if err := PeerConnectLoopback(peer, port, args[1]); err != nil {
@@ -105,7 +109,9 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, port, action string, args
 	// DISCONNECT <peer-id>
 	if action == JACKIE_DISCONNECT {
 		peer.UnsetNeighbor(args[0])
+
 		log.Println("Disconnected to", args[0])
+
 		return nil
 	}
 
@@ -135,13 +141,9 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, port, action string, args
 			return err
 		}
 
-		mu.Lock()
-
 		cchain := new(blockchain.Chain)
 		err = json.NewDecoder(bytes.NewBuffer(bs)).Decode(chain)
 		chain = cchain
-
-		mu.Unlock()
 
 		if err != nil {
 			return err
@@ -152,14 +154,30 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, port, action string, args
 	}
 
 	return errors.New("Invalid jackie action")
+
+	return nil
 }
 
-func HTTPHandler(chain *blockchain.Chain, conn net.Conn, req *http.Request) error {
+func HTTPHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port string, conn net.Conn, req *http.Request) error {
 	defer conn.Close()
 
+	if req.Method == http.MethodGet {
+		if req.URL.Path == "/transactions" {
+			return ListTxsHandler(*chain, conn, req)
+		}
+
+		if req.URL.Path == "/blocks" {
+			return ListBlocksHandler(*chain, conn, req)
+		}
+
+		if req.URL.Path == "/info" {
+			return GetPeerInfoHandler(upat, port, peer, conn, req)
+		}
+	}
+
 	if req.Method == http.MethodPost {
-		if req.URL.Path == "/tx" {
-			return CreateTxHandler(*chain, conn, req)
+		if req.URL.Path == "/transactions" {
+			return CreateTxHandler(chain, conn, req)
 		}
 	}
 

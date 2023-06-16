@@ -53,8 +53,8 @@ func PeerConnectLoopback(peer Peer, port, to string) error {
 	return Send(to, JACKIE_CONNECT_LOOPBACK, args)
 }
 
-func PeerDisconnect(peer Peer, to string) error {
-	args := []string{peer.GetID()}
+func PeerDisconnect(id, to string) error {
+	args := []string{id}
 	return Send(to, JACKIE_DISCONNECT, args)
 }
 

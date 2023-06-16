@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/guiferpa/jackiechain/blockchain"
 	"github.com/guiferpa/jackiechain/v2/node"
@@ -61,7 +62,12 @@ func main() {
 		}
 	}
 
-	go node.MineNewBlock(walletAddr, chain)
+	miningTicker := time.NewTicker(1 * time.Minute)
+	go node.MineNewBlock(walletAddr, chain, miningTicker)
 
 	<-sigc
+
+	node.TerminatePeer(peer)
+
+	log.Println("Peer", peer.GetID(), "terminated")
 }

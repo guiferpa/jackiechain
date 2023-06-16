@@ -1,13 +1,34 @@
 package blockchain
 
 import (
-	"github.com/mr-tron/base58/base58"
+	"bytes"
+	"fmt"
+	"time"
 )
 
 type TransactionOutput struct {
-	Signature []byte
-	Receiver  string
-	Amount    int
+	Signature []byte    `json:"signature"`
+	Receiver  string    `json:"receiver"`
+	Amount    int       `json:"amount"`
+	Timestamp time.Time `json:"-"`
+}
+
+func (to *TransactionOutput) Buffer() *bytes.Buffer {
+	return bytes.NewBufferString(fmt.Sprintf(
+		"%s::%s::%v",
+		to.Receiver,
+		to.Amount,
+		to.Timestamp,
+	))
+}
+
+func (to *TransactionOutput) ToInput() *TransactionInput {
+	return &TransactionInput{
+		Signature:    to.Signature,
+		Sender:       to.Receiver,
+		Amount:       to.Amount,
+		TxOutputHash: CalculateTxEntryHash(to),
+	}
 }
 
 type TransactionOutputOptions struct {
@@ -17,31 +38,8 @@ type TransactionOutputOptions struct {
 
 func NewTransactionOutput(opts TransactionOutputOptions) *TransactionOutput {
 	return &TransactionOutput{
-		Receiver: opts.Receiver,
-		Amount:   opts.Amount,
+		Receiver:  opts.Receiver,
+		Amount:    opts.Amount,
+		Timestamp: time.Now(),
 	}
-}
-
-func (to *TransactionOutput) SignTransactionOutput() error {
-	// Getting public key from wallet address
-	_, err := base58.Decode(to.Receiver)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (to *TransactionOutput) ToInput() *TransactionInput {
-	return &TransactionInput{
-		Signature: to.Signature,
-		Sender:    to.Receiver,
-		Amount:    to.Amount,
-	}
-}
-
-func NewSignedTransactionInput(opts TransactionOutputOptions) (*TransactionOutput, error) {
-	tx := NewTransactionOutput(opts)
-	tx.SignTransactionOutput()
-	return tx, nil
 }

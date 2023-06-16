@@ -10,17 +10,17 @@ import (
 )
 
 type BlockHeader struct {
-	Version           string    `json:"version"`
-	Nonce             int       `json:"nonce"`
-	Timestamp         time.Time `json:"timestamp"`
-	PreviousBlockHash string    `json:"previous_block_hash"`
+	Version           string `json:"version"`
+	Nonce             int    `json:"nonce"`
+	Timestamp         int64  `json:"timestamp"`
+	PreviousBlockHash string `json:"previous_block_hash"`
 }
 
 func (bh BlockHeader) Buffer() *bytes.Buffer {
 	return bytes.NewBufferString(fmt.Sprintf(
 		"%s::%d::%d::%s",
 		bh.PreviousBlockHash,
-		bh.Timestamp.UnixMilli(),
+		bh.Timestamp,
 		bh.Nonce,
 		bh.Version,
 	))
@@ -45,8 +45,9 @@ func (b *Block) Mine(dif int, miner string) {
 func NewBlock(pbh string, transactions Transactions) *Block {
 	return &Block{
 		Header: BlockHeader{
+			Version:           "1",
 			PreviousBlockHash: pbh,
-			Timestamp:         time.Now(),
+			Timestamp:         time.Now().UnixMilli(),
 		},
 		Transactions: transactions,
 	}
