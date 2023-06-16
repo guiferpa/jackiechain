@@ -22,3 +22,4 @@ go.work
 *.pem
 
 cmd/tes/
+jackie
