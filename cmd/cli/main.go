@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/guiferpa/jackiechain/blockchain"
-	"github.com/guiferpa/jackiechain/v2/logger"
-	"github.com/guiferpa/jackiechain/v2/node"
+	"github.com/guiferpa/jackiechain/logger"
+	"github.com/guiferpa/jackiechain/node"
 	"github.com/guiferpa/jackiechain/wallet"
 )
 
