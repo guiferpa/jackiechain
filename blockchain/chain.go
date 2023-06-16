@@ -61,14 +61,12 @@ type ChainOptions struct {
 }
 
 func NewChain(opts ChainOptions) *Chain {
-	genesisBlock := NewBlock("", []Transaction{})
-
 	return &Chain{
 		MiningDifficulty:    opts.MiningDifficulty,
 		MiningReward:        opts.MiningReward,
 		PendingTransactions: make(Transactions, 0),
 		Transactions:        make(Transactions, 0),
 		UTXO:                make(map[string]TransactionOutput),
-		Blocks:              []Block{*genesisBlock},
+		Blocks:              []Block{},
 	}
 }
