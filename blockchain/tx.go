@@ -1,11 +1,9 @@
 package blockchain
 
 import (
-	"bytes"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -25,14 +23,6 @@ type Receiver struct {
 
 type Transactions []Transaction
 
-func (ts Transactions) String() string {
-	b := bytes.NewBuffer([]byte(""))
-	if err := json.NewEncoder(b).Encode(ts); err != nil {
-		panic(err)
-	}
-	return b.String()
-}
-
 type Transaction struct {
 	Signature []byte              `json:"signature"`
 	Sender    *wallet.Wallet      `json:"-"`
@@ -42,7 +32,7 @@ type Transaction struct {
 }
 
 func (t *Transaction) CalculateHash() string {
-	payload := fmt.Sprintf("%s::%s::%v::%v", t.Timestamp)
+	payload := fmt.Sprintf("%d", t.Timestamp)
 	h := sha256.New()
 	h.Write([]byte(payload))
 	return hex.EncodeToString(h.Sum(nil))
@@ -82,7 +72,7 @@ func NewTransaction(opts TransactionOptions) *Transaction {
 		Sender:    opts.Sender,
 		Inputs:    opts.Inputs,
 		Outputs:   opts.Outputs,
-		Timestamp: time.Now().UnixNano(),
+		Timestamp: time.Now().Unix(),
 	}
 }
 

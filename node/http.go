@@ -74,11 +74,17 @@ func CreateTxHTTPHandler(peer Peer, chain *blockchain.Chain, conn net.Conn, req 
 	return httputil.Response(req, conn, http.StatusNoContent, nil)
 }
 
+type ListTxsHTTPResponseBody blockchain.Transactions
+
 func ListTxsHTTPHandler(chain blockchain.Chain, conn net.Conn, req *http.Request) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	txs := chain.Transactions
+	txs := make(ListTxsHTTPResponseBody, len(chain.Transactions))
+
+	for i, tx := range chain.Transactions {
+		txs[cap(txs)-(i+1)] = tx
+	}
 
 	buf := new(bytes.Buffer)
 	if err := json.NewEncoder(buf).Encode(txs); err != nil {
@@ -99,13 +105,13 @@ func ListBlocksHTTPHandler(chain blockchain.Chain, conn net.Conn, req *http.Requ
 	mu.Lock()
 	defer mu.Unlock()
 
-	blocks := make(ListBlockResponseBody, 0)
+	blocks := make(ListBlockResponseBody, len(chain.Blocks))
 
-	for _, block := range chain.Blocks {
-		blocks = append(blocks, ListBlockInfo{
+	for i, block := range chain.Blocks {
+		blocks[cap(blocks)-(i+1)] = ListBlockInfo{
 			Block: block,
 			Hash:  blockchain.CalculateBlockHash(block),
-		})
+		}
 	}
 
 	buf := new(bytes.Buffer)
