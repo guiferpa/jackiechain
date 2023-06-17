@@ -128,11 +128,10 @@ type PeerInfo struct {
 }
 
 type GetPeerInfoHTTPResponseBody struct {
-	ID          string        `json:"id"`
-	Uptime      time.Duration `json:"uptime"`
-	Peers       []PeerInfo    `json:"peers"`
-	NodePort    string        `json:"node_port"`
-	MiningClock string        `json:"mining_clock"`
+	ID       string        `json:"id"`
+	Uptime   time.Duration `json:"uptime"`
+	Peers    []PeerInfo    `json:"peers"`
+	NodePort string        `json:"node_port"`
 }
 
 func GetPeerInfoHTTPHandler(upat time.Time, port string, peer Peer, conn net.Conn, req *http.Request) error {
@@ -144,11 +143,10 @@ func GetPeerInfoHTTPHandler(upat time.Time, port string, peer Peer, conn net.Con
 	}
 
 	body := GetPeerInfoHTTPResponseBody{
-		ID:          peer.GetID(),
-		NodePort:    port,
-		Peers:       peers,
-		Uptime:      time.Duration(uptime / time.Second),
-		MiningClock: "",
+		ID:       peer.GetID(),
+		NodePort: port,
+		Peers:    peers,
+		Uptime:   time.Duration(uptime / time.Second),
 	}
 
 	buf := new(bytes.Buffer)
