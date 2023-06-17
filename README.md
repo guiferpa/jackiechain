@@ -4,4 +4,4 @@
 <a href="#"><img src="https://img.shields.io/badge/version-0.0.1-brightgreen.svg" alt="Version"></a>
 </p>
 
-This project's a implementation of Bitcoin specifications to make programmers lifes easier that intend to know more about that.
+This project's an implementation of [Bitcoin](https://bitcoin.org/en/) specifications and the goal's make programmers lifes easier that intend to know more about that. Fork it and help it to become more solid.
