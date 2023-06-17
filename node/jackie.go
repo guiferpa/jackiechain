@@ -11,6 +11,8 @@ import (
 )
 
 const (
+	JACKIE_BLOCK_APPROBATTION_OK   = "BLOCK_APPROBATION_OK"
+	JACKIE_BLOCK_APPROBATTION      = "BLOCK_APPROBATION"
 	JACKIE_DOWNLOAD_BLOACKCHAIN_OK = "DOWNLOAD_BLOCKCHAIN_OK"
 	JACKIE_DOWNLOAD_BLOACKCHAIN    = "DOWNLOAD_BLOCKCHAIN"
 	JACKIE_TX_APPROBATION_FAIL     = "TX_APPROBATION_FAIL"
@@ -92,4 +94,9 @@ func DownloadBlockchainRequest(id string, to string) error {
 func DownloadBlockchainOK(id, chain, to string) error {
 	args := []string{id, chain}
 	return Send(to, JACKIE_DOWNLOAD_BLOACKCHAIN_OK, args)
+}
+
+func BlockApprobationRequest(id, block, to string) error {
+	args := []string{id, block}
+	return Send(to, JACKIE_BLOCK_APPROBATTION, args)
 }

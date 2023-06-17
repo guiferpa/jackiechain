@@ -3,6 +3,8 @@ package node
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -65,10 +67,25 @@ func Listen(port string, verbose bool, peer Peer, chain *blockchain.Chain) {
 	}
 }
 
-func MineNewBlock(wallet string, chain *blockchain.Chain, miningTicker *time.Ticker) {
+func MineNewBlock(wallet string, peer Peer, chain *blockchain.Chain, miningTicker *time.Ticker) {
 	for range miningTicker.C {
 		mu.Lock()
-		log.Println("Block", chain.MineBlock(wallet), "mined")
+		block := chain.MineBlock(wallet)
+		log.Println("Block", blockchain.CalculateBlockHash(block), "mined")
+
+		buf := new(bytes.Buffer)
+		if err := json.NewEncoder(buf).Encode(&block); err != nil {
+			logger.Red(err.Error())
+			continue
+		}
+
+		encblock := base64.StdEncoding.EncodeToString(buf.Bytes())
+
+		for _, neighbor := range peer.GetNeighborhood() {
+			if err := BlockApprobationRequest(peer.GetID(), encblock, neighbor); err != nil {
+				logger.Red(err.Error())
+			}
+		}
 		mu.Unlock()
 	}
 }

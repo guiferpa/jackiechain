@@ -94,7 +94,7 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port, act
 		return nil
 	}
 
-	// CONNECT_LOOPBACK <peer-id> <peer-addr>
+	// CONNECT_LOOPBACK <peer-id> <peer-addr> <mining-clock>
 	if action == JACKIE_CONNECT_LOOPBACK {
 		if err := peer.SetNeighbor(args[0], args[1]); err != nil {
 			if errors.Is(err, ErrJackieDuplcatedPeer) {
@@ -175,6 +175,27 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port, act
 		chain.AddPendingTransaction(tx)
 
 		log.Println("Tx", tx.CalculateHash(), "received from peer", args[0])
+
+		return nil
+	}
+
+	// BLOCK_APPROBATION <peer-id> <block-encoded-b64>
+	if action == JACKIE_BLOCK_APPROBATTION {
+		raw := strings.Trim(args[1], "\x00")
+
+		bs, err := base64.StdEncoding.DecodeString(raw)
+		if err != nil {
+			return err
+		}
+
+		block := blockchain.Block{}
+		if err := json.NewDecoder(bytes.NewBuffer(bs)).Decode(&block); err != nil {
+			return err
+		}
+
+		chain.Blocks = append(chain.Blocks, block)
+
+		log.Println("Block", blockchain.CalculateBlockHash(block), "accepted from peer", args[0])
 
 		return nil
 	}

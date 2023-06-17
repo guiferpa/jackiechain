@@ -29,7 +29,7 @@ func (c *Chain) AddPendingTransaction(tx Transaction) {
 	c.PendingTransactions = append(ptxs, tx)
 }
 
-func (c *Chain) MineBlock(miner string) string {
+func (c *Chain) MineBlock(miner string) Block {
 	ptxs := c.PendingTransactions
 
 	previousBlockHash := c.GetLatestBlockHash()
@@ -51,7 +51,7 @@ func (c *Chain) MineBlock(miner string) string {
 	})
 	c.AddPendingTransaction(*cbtx)
 
-	return CalculateBlockHash(*candidateBlock)
+	return *candidateBlock
 }
 
 func (c *Chain) GetLatestBlockHash() string {

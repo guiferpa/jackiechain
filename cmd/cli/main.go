@@ -74,8 +74,8 @@ func main() {
 		}
 	}
 
-	miningTicker := time.NewTicker(2 * time.Minute)
-	go node.MineNewBlock(miner, chain, miningTicker)
+	miningTicker := time.NewTicker(20 * time.Second)
+	go node.MineNewBlock(miner, peer, chain, miningTicker)
 
 	<-sigc
 
