@@ -34,7 +34,7 @@ func Listen(port string, verbose bool, peer Peer, chain *blockchain.Chain) {
 		}
 
 		bs := make([]byte, MAX_CHUNK_SIZE)
-		_, err = conn.Read(bs)
+		size, err := conn.Read(bs)
 		if err == io.EOF {
 			continue
 		}
@@ -43,7 +43,7 @@ func Listen(port string, verbose bool, peer Peer, chain *blockchain.Chain) {
 			continue
 		}
 
-		buf := bytes.NewBuffer(bs)
+		buf := bytes.NewBuffer(bs[:size])
 
 		if verbose {
 			logger.Yellow(buf.String())

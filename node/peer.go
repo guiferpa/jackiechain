@@ -43,6 +43,10 @@ func (s *Service) SetNeighbor(id, addr string) error {
 	id = strings.Trim(id, "\x00")
 	addr = strings.Trim(addr, "\x00")
 
+	if id == s.id {
+		return nil
+	}
+
 	if _, exists := s.neighborhood[id]; exists {
 		ErrJackieDuplcatedPeer.PeerId = id
 		ErrJackieDuplcatedPeer.PeerAddr = addr
@@ -72,16 +76,6 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port, act
 
 	// CONNECT <peer-id> <peer-addr>
 	if action == JACKIE_CONNECT {
-		if err := PeerConnectLoopback(peer, port, args[1]); err != nil {
-			return err
-		}
-
-		for _, neighbor := range peer.GetNeighborhood() {
-			if err := PeerConnectRequest(args[0], args[1], neighbor); err != nil {
-				return err
-			}
-		}
-
 		if err := peer.SetNeighbor(args[0], args[1]); err != nil {
 			if errors.Is(err, ErrJackieDuplcatedPeer) {
 				return nil
@@ -89,12 +83,24 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port, act
 			return err
 		}
 
+		if err := PeerConnectLoopback(peer.GetID(), port, args[1]); err != nil {
+			return err
+		}
+
+		for id, neighbor := range peer.GetNeighborhood() {
+			if id != args[0] {
+				if err := PeerConnectRequest(args[0], args[1], neighbor); err != nil {
+					return err
+				}
+			}
+		}
+
 		log.Println("Connected to", args[0])
 
 		return nil
 	}
 
-	// CONNECT_LOOPBACK <peer-id> <peer-addr> <mining-clock>
+	// CONNECT_LOOPBACK <peer-id> <peer-addr>
 	if action == JACKIE_CONNECT_LOOPBACK {
 		if err := peer.SetNeighbor(args[0], args[1]); err != nil {
 			if errors.Is(err, ErrJackieDuplcatedPeer) {
@@ -105,8 +111,10 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port, act
 
 		log.Println("Connected to", args[0])
 
-		if err := DownloadBlockchainRequest(peer.GetID(), args[1]); err != nil {
-			return err
+		if len(peer.GetNeighborhood()) == 1 {
+			if err := DownloadBlockchainRequest(peer.GetID(), args[1]); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -114,7 +122,8 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port, act
 
 	// DISCONNECT <peer-id>
 	if action == JACKIE_DISCONNECT {
-		peer.UnsetNeighbor(args[0])
+		id := strings.Trim(args[0], "\x00")
+		peer.UnsetNeighbor(id)
 
 		log.Println("Disconnected to", args[0])
 
@@ -140,9 +149,7 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port, act
 
 	// DOWNLOAD_BLOCKCHAIN_OK <peer-id> <chain-b64-encoded>
 	if action == JACKIE_DOWNLOAD_BLOACKCHAIN_OK {
-		raw := strings.Trim(args[1], "\x00")
-
-		bs, err := base64.StdEncoding.DecodeString(raw)
+		bs, err := base64.StdEncoding.DecodeString(args[1])
 		if err != nil {
 			return err
 		}

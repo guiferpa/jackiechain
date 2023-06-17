@@ -54,7 +54,7 @@ func PeerConnectRequest(id, addr, to string) error {
 	return Send(to, JACKIE_CONNECT, args)
 }
 
-func PeerConnectLoopback(peer Peer, port, to string) error {
+func PeerConnectLoopback(id, port, to string) error {
 	conn, err := net.Dial("udp", to)
 	if err != nil {
 		return err
@@ -62,7 +62,7 @@ func PeerConnectLoopback(peer Peer, port, to string) error {
 
 	ip := conn.LocalAddr().(*net.UDPAddr).IP
 	addr := fmt.Sprintf("%s:%s", ip, port)
-	args := []string{peer.GetID(), addr}
+	args := []string{id, addr}
 	return Send(to, JACKIE_CONNECT_LOOPBACK, args)
 }
 
