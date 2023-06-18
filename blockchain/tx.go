@@ -31,15 +31,8 @@ type Transaction struct {
 	Timestamp int64               `json:"timestamp"`
 }
 
-func (t *Transaction) CalculateHash() string {
-	payload := fmt.Sprintf("%d", t.Timestamp)
-	h := sha256.New()
-	h.Write([]byte(payload))
-	return hex.EncodeToString(h.Sum(nil))
-}
-
 func (t *Transaction) Sign(privKey ed25519.PrivateKey) {
-	h := t.CalculateHash()
+	h := CalculateTxHash(*t)
 	s := sha256.New()
 	s.Write([]byte(h))
 	signature := ed25519.Sign(privKey, []byte(h))
@@ -56,7 +49,7 @@ func (t *Transaction) HasValidSignature() (bool, error) {
 		return false, err
 	}
 
-	h := t.CalculateHash()
+	h := CalculateTxHash(*t)
 
 	return ed25519.Verify(b, []byte(h), t.Signature[:ed25519.SignatureSize]), nil
 }
@@ -72,7 +65,7 @@ func NewTransaction(opts TransactionOptions) *Transaction {
 		Sender:    opts.Sender,
 		Inputs:    opts.Inputs,
 		Outputs:   opts.Outputs,
-		Timestamp: time.Now().Unix(),
+		Timestamp: time.Now().UnixMilli(),
 	}
 }
 
@@ -91,4 +84,11 @@ func NewCoinbaseTransaction(opts CoinbaseTransactionOptions) *Transaction {
 		Inputs:  make([]TransactionInput, 0),
 		Outputs: opts.Outputs,
 	})
+}
+
+func CalculateTxHash(tx Transaction) string {
+	payload := fmt.Sprintf("%d", tx.Timestamp)
+	h := sha256.New()
+	h.Write([]byte(payload))
+	return hex.EncodeToString(h.Sum(nil))
 }

@@ -47,7 +47,7 @@ func NewBlock(pbh string, transactions Transactions) *Block {
 		Header: BlockHeader{
 			Version:           "1",
 			PreviousBlockHash: pbh,
-			Timestamp:         time.Now().Unix(),
+			Timestamp:         time.Now().UnixMilli(),
 		},
 		Transactions: transactions,
 	}

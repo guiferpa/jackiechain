@@ -181,7 +181,7 @@ func JackieHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port, act
 
 		chain.AddPendingTransaction(tx)
 
-		log.Println("Tx", tx.CalculateHash(), "received from peer", args[0])
+		log.Println("Tx", blockchain.CalculateTxHash(tx), "received from peer", args[0])
 
 		return nil
 	}
@@ -247,6 +247,10 @@ func HTTPHandler(peer Peer, chain *blockchain.Chain, upat time.Time, port string
 		if req.URL.Path == "/wallets" {
 			return CreateWalletHTTPHandler(conn, req)
 		}
+	}
+
+	if req.Method == http.MethodOptions {
+		return httputil.ResponseCORS(req, conn)
 	}
 
 	return httputil.ResponseNotFound(req, conn)

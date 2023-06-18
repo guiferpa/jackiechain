@@ -53,6 +53,30 @@ func Response(r *http.Request, w io.Writer, statusCode int, body *bytes.Buffer) 
 	return err
 }
 
+func ResponseCORS(r *http.Request, w io.Writer) error {
+	header := make(http.Header, 0)
+	header.Set("Origin", r.Host)
+	header.Set("Date", time.Now().Format(time.RFC1123))
+	header.Set("Access-Control-Allow-Origin", "*")
+	header.Set("Access-Control-Allow-Headers", "*")
+	header.Set("Access-Control-Allow-Methods", "*")
+	header.Set("Access-Control-Max-Age", "86400")
+
+	resp := newHTTPResponse(r, http.StatusOK, header, nil)
+
+	bs := &bytes.Buffer{}
+	if err := resp.Write(bs); err != nil {
+		return err
+	}
+
+	_, err := fmt.Fprint(w, bs)
+	if err == io.EOF {
+		return nil
+	}
+
+	return err
+}
+
 func ResponseNotFound(r *http.Request, w io.Writer) error {
 	body := "{\"message\": \"not found\"}"
 	return Response(r, w, http.StatusNotFound, bytes.NewBufferString(body))

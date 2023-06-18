@@ -73,23 +73,50 @@ func CreateTxHTTPHandler(peer Peer, chain *blockchain.Chain, conn net.Conn, req 
 		TxApprobationRequest(peer.GetID(), *tx, neighbor)
 	}
 
-	return httputil.Response(req, conn, http.StatusNoContent, nil)
+	buf := bytes.NewBufferString("{\"message\": \"ok\"}")
+	return httputil.Response(req, conn, http.StatusCreated, buf)
 }
 
-type ListTxsHTTPResponseBody blockchain.Transactions
+type ListTxsHTTPResponseBodyTx struct {
+	blockchain.Transaction
+	Hash string `json:"hash"`
+}
+
+type ListTxsHTTPResponseBody struct {
+	Offset int                         `json:"offset"`
+	Limit  int                         `json:"limit"`
+	Total  int                         `json:"total"`
+	Txs    []ListTxsHTTPResponseBodyTx `json:"transactions"`
+}
 
 func ListTxsHTTPHandler(chain blockchain.Chain, conn net.Conn, req *http.Request) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	txs := make(ListTxsHTTPResponseBody, len(chain.Transactions))
+	resp := ListTxsHTTPResponseBody{
+		Offset: httputil.GetQueryInt(req, "offset", 0),
+		Limit:  httputil.GetQueryInt(req, "limit", 8),
+		Total:  len(chain.Transactions),
+		Txs:    make([]ListTxsHTTPResponseBodyTx, 0),
+	}
 
-	for i, tx := range chain.Transactions {
-		txs[cap(txs)-(i+1)] = tx
+	txs := linq.
+		From(chain.Transactions).
+		Reverse().
+		Skip(resp.Offset).
+		Take(resp.Limit).
+		Results()
+
+	for _, item := range txs {
+		tx := item.(blockchain.Transaction)
+		resp.Txs = append(resp.Txs, ListTxsHTTPResponseBodyTx{
+			Transaction: tx,
+			Hash:        blockchain.CalculateTxHash(tx),
+		})
 	}
 
 	buf := new(bytes.Buffer)
-	if err := json.NewEncoder(buf).Encode(txs); err != nil {
+	if err := json.NewEncoder(buf).Encode(resp); err != nil {
 		return httputil.ResponseBadRequest(req, conn, err.Error())
 	}
 
@@ -114,7 +141,7 @@ func ListBlocksHTTPHandler(chain blockchain.Chain, conn net.Conn, req *http.Requ
 
 	resp := &ListBlockResponseBody{
 		Offset: httputil.GetQueryInt(req, "offset", 0),
-		Limit:  httputil.GetQueryInt(req, "limit", 5),
+		Limit:  httputil.GetQueryInt(req, "limit", 8),
 		Total:  len(chain.Blocks),
 		Blocks: make([]ListBlockResponseBodyBlock, 0),
 	}
