@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	linq "github.com/ahmetb/go-linq/v3"
+
 	"github.com/guiferpa/jackiechain/blockchain"
 	"github.com/guiferpa/jackiechain/httputil"
 	"github.com/guiferpa/jackiechain/wallet"
@@ -94,28 +96,46 @@ func ListTxsHTTPHandler(chain blockchain.Chain, conn net.Conn, req *http.Request
 	return httputil.Response(req, conn, http.StatusOK, buf)
 }
 
-type ListBlockInfo struct {
+type ListBlockResponseBodyBlock struct {
 	blockchain.Block
 	Hash string `json:"hash"`
 }
 
-type ListBlockResponseBody []ListBlockInfo
+type ListBlockResponseBody struct {
+	Total  int                          `json:"total"`
+	Offset int                          `json:"offset"`
+	Limit  int                          `json:"limit"`
+	Blocks []ListBlockResponseBodyBlock `json:"blocks"`
+}
 
 func ListBlocksHTTPHandler(chain blockchain.Chain, conn net.Conn, req *http.Request) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	blocks := make(ListBlockResponseBody, len(chain.Blocks))
+	resp := &ListBlockResponseBody{
+		Offset: httputil.GetQueryInt(req, "offset", 0),
+		Limit:  httputil.GetQueryInt(req, "limit", 5),
+		Total:  len(chain.Blocks),
+		Blocks: make([]ListBlockResponseBodyBlock, 0),
+	}
 
-	for i, block := range chain.Blocks {
-		blocks[cap(blocks)-(i+1)] = ListBlockInfo{
+	blocks := linq.
+		From(chain.Blocks).
+		Reverse().
+		Skip(resp.Offset).
+		Take(resp.Limit).
+		Results()
+
+	for _, item := range blocks {
+		block := item.(blockchain.Block)
+		resp.Blocks = append(resp.Blocks, ListBlockResponseBodyBlock{
 			Block: block,
 			Hash:  blockchain.CalculateBlockHash(block),
-		}
+		})
 	}
 
 	buf := new(bytes.Buffer)
-	if err := json.NewEncoder(buf).Encode(blocks); err != nil {
+	if err := json.NewEncoder(buf).Encode(resp); err != nil {
 		return httputil.ResponseBadRequest(req, conn, err.Error())
 	}
 
