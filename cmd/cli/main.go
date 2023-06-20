@@ -21,6 +21,7 @@ var (
 	port    string
 	verbose bool
 	miner   string
+	ticker  int64
 )
 
 func init() {
@@ -28,6 +29,7 @@ func init() {
 	flag.StringVar(&port, "port", "3000", "set port")
 	flag.BoolVar(&verbose, "verbose", false, "set verbose")
 	flag.StringVar(&miner, "wallet", "", "set miner wallet address")
+	flag.Int64Var(&ticker, "ticker", 600, "(just for dev): set program ticker, it's applicable for mining ticker") // default 10 minutes
 }
 
 func main() {
@@ -74,7 +76,7 @@ func main() {
 		}
 	}
 
-	miningTicker := time.NewTicker(20 * time.Second)
+	miningTicker := time.NewTicker(time.Duration(ticker) * time.Second)
 	go node.MineNewBlock(miner, peer, chain, miningTicker)
 
 	<-sigc
