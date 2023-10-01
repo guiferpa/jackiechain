@@ -17,18 +17,17 @@ func (w *Wallet) GetAddress() string {
 }
 
 func (w *Wallet) GetPrivateSeed() string {
-	return base58.Encode(w.PrivateKey.Seed())
+	return base58.Encode(w.PrivateKey)
 }
 
 func NewWallet() (*Wallet, error) {
-	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, err
 	}
-
 	return &Wallet{
 		PrivateKey: priv,
-		PublicKey:  priv.Public().(ed25519.PublicKey),
+		PublicKey:  pub,
 	}, nil
 }
 
@@ -37,13 +36,10 @@ func ParseWallet(raw string) (*Wallet, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	priv := ed25519.NewKeyFromSeed(seed)
-
 	w := &Wallet{
 		PrivateKey: priv,
 		PublicKey:  priv.Public().(ed25519.PublicKey),
 	}
-
 	return w, nil
 }
