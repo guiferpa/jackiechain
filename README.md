@@ -8,6 +8,8 @@ This project's an implementation of [Bitcoin](https://bitcoin.org/en/) specifica
 
 ### Study list
 
+- Cryptography
+  - [A security site](https://asecuritysite.com/golang/)
 - Asymmetric cryptography
 - Elliptic curve cryptography
 - Hash (SHA256)
