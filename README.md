@@ -5,3 +5,11 @@
 </p>
 
 This project's an implementation of [Bitcoin](https://bitcoin.org/en/) specifications and the goal's make programmers lifes easier that intend to know more about that. Fork it and help it to become more solid.
+
+### Study list
+
+- Asymmetric cryptography
+- Elliptic curve cryptography
+- Hash (SHA256)
+- Markle tree
+- Byzantine fault tolerance
