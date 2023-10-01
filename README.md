@@ -15,3 +15,5 @@ This project's an implementation of [Bitcoin](https://bitcoin.org/en/) specifica
 - Hash (SHA256)
 - Markle tree
 - Byzantine fault tolerance
+- Consensus algorithm
+  - [Raft implementation (HashiCorp)](https://github.com/hashicorp/raft)
