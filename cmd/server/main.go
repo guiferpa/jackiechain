@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/guiferpa/jackiechain/block"
 	"github.com/guiferpa/jackiechain/blockchain"
 	"github.com/guiferpa/jackiechain/logger"
 	"github.com/guiferpa/jackiechain/transaction"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -20,6 +22,16 @@ func main() {
 		GenesisBlock:     nil,
 		LatestBlock:      nil,
 	}
+
+	logger.Magenta(fmt.Sprint("Running gRPC server"))
+
+	listener, err := net.Listen("tcp", "localhost:9000")
+	if err != nil {
+		logger.Red(err.Error())
+		return
+	}
+
+	s := grpc.NewServer()
 
 	ticker := time.NewTicker(time.Second * 5)
 

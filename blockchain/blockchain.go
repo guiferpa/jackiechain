@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/guiferpa/jackiechain/block"
+	"github.com/guiferpa/jackiechain/merkletree"
 	"github.com/guiferpa/jackiechain/transaction"
 )
 
@@ -39,10 +40,15 @@ func MiningBlock(bc *Blockchain, b *block.Block) (string, error) {
 }
 
 func BuildBlock(bc *Blockchain) (string, error) {
+	txhs, err := bc.PendingTxs.ToSlice().GenerateTxHashes()
+	if err != nil {
+		return "", err
+	}
 	b := &block.Block{
 		Header: block.BlockHeader{
-			Version:   "1",
-			Timestamp: time.Now().UnixMilli(),
+			Version:            "1",
+			MerkleTreeRootHash: merkletree.GenerateRootHash(txhs),
+			Timestamp:          time.Now().UnixMilli(),
 		},
 		Transactions: bc.PendingTxs,
 	}

@@ -40,6 +40,14 @@ func (txs TxSlice) GenerateTxHashes() ([]string, error) {
 
 type TxMap map[string]Tx
 
+func (txm TxMap) ToSlice() TxSlice {
+	txs := make(TxSlice, 0)
+	for _, tx := range txm {
+		txs = append(txs, tx)
+	}
+	return txs
+}
+
 func GenerateTxHash(tx Tx) (string, error) {
 	bs, err := tx.Bytes()
 	if err != nil {

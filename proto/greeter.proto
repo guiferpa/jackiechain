@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+option go_package = "./dist/proto";
+
+service Greeter {
+  rpc ReachOut (PingRequest) returns (PongResponse) {}
+}
+
+message PingRequest {}
+
+message PongResponse {}
+
