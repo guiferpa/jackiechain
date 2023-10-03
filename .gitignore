@@ -21,5 +21,5 @@
 go.work
 *.pem
 
-cmd/tes/
+dist/
 jackie

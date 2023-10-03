@@ -6,14 +6,17 @@ import (
 	"fmt"
 )
 
-func GenerateLeafHash(hl string, hr string) string {
-	payload := fmt.Sprintf("H::%s%s", hl, hr)
+func generateLeafHash(hl string, hr string) string {
+	payload := fmt.Sprintf("%s%s", hl, hr)
 	h := sha256.New()
 	h.Write([]byte(payload))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
 func GenerateRootHash(hs []string) string {
+	if len(hs) == 0 {
+		return ""
+	}
 	if len(hs) == 1 {
 		return hs[0]
 	}
@@ -23,7 +26,7 @@ func GenerateRootHash(hs []string) string {
 		if i+1 < len(hs) {
 			l := hs[i]
 			r := hs[i+1]
-			nhs = append(nhs, GenerateLeafHash(l, r))
+			nhs = append(nhs, generateLeafHash(l, r))
 			i += 2
 			continue
 		}

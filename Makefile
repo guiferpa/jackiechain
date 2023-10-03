@@ -1,8 +1,8 @@
-install: build
+install: build_server build_client
 
-build:
-	@CGO_ENABLED=1 go build -race -o $(shell go env GOPATH)/bin/jackie ./cmd/cli/*.go
+build_server:
+	@CGO_ENABLED=1 go build -race -o $(shell go env GOPATH)/bin/jackie-server ./cmd/server/*.go
 
-prod:
-	@CGO_ENABLED=0 go build -v -o jackie ./cmd/cli/*.go
+build_client:
+	@CGO_ENABLED=1 go build -race -o $(shell go env GOPATH)/bin/jackie-client ./cmd/client/*.go
 

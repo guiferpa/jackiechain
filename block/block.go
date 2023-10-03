@@ -9,10 +9,11 @@ import (
 )
 
 type BlockHeader struct {
-	Version           string `json:"version"`
-	Nonce             int    `json:"nonce"`
-	Timestamp         int64  `json:"timestamp"`
-	PreviousBlockHash string `json:"previous_block_hash"`
+	Version            string `json:"version"`
+	MerkleTreeRootHash string `json:"merkle_tree_root_hash"`
+	Nonce              int    `json:"nonce"`
+	Timestamp          int64  `json:"timestamp"`
+	PreviousBlockHash  string `json:"previous_block_hash"`
 }
 
 func (bh BlockHeader) Bytes() ([]byte, error) {
