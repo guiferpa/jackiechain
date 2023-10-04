@@ -11,7 +11,6 @@ import (
 	"github.com/guiferpa/jackiechain/dist/proto"
 	"github.com/guiferpa/jackiechain/logger"
 	"github.com/guiferpa/jackiechain/transaction"
-
 	"google.golang.org/grpc"
 )
 
@@ -27,6 +26,18 @@ func main() {
 	}
 
 	is := NewServer(bc)
+
+	logger.Magenta(fmt.Sprint("Running gRPC server"))
+
+	listener, err := net.Listen("tcp", "localhost:9000")
+	if err != nil {
+		logger.Red(err.Error())
+		return
+	}
+
+	s := grpc.NewServer()
+
+	ticker := time.NewTicker(time.Second * 5)
 
 	logger.Magenta(fmt.Sprint("Running gRPC server"))
 
