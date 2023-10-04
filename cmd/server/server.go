@@ -16,6 +16,7 @@ type Server struct {
 }
 
 func (s *Server) ReachOut(ctx context.Context, pr *proto.PingRequest) (*proto.PongResponse, error) {
+	logger.Yellow("PING")
 	return &proto.PongResponse{Text: "PONG"}, nil
 }
 
