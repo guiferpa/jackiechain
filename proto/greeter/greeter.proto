@@ -7,9 +7,11 @@ service Greeter {
   rpc ReachOut (PingRequest) returns (PongResponse) {}
 }
 
-message PingRequest {}
+message PingRequest {
+  string aid = 1;
+}
 
 message PongResponse {
-  string text = 1;
+  string pid = 1;
 }
 

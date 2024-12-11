@@ -20,8 +20,8 @@ type Peer struct {
 }
 
 func (s *Peer) ReachOut(ctx context.Context, pr *protogreeter.PingRequest) (*protogreeter.PongResponse, error) {
-	logger.Yellow("PING")
-	return &protogreeter.PongResponse{Text: "PONG"}, nil
+	logger.Yellow(fmt.Sprintf("Ping from agent %s", pr.Aid))
+	return &protogreeter.PongResponse{Pid: string(s.ID)}, nil
 }
 
 func (s *Peer) SetBuildBlockInterval(ticker *time.Ticker) {

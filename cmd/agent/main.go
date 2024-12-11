@@ -8,9 +8,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/guiferpa/jackiechain/cmd/agent/actions"
-	protogreeter "github.com/guiferpa/jackiechain/proto/greeter"
 	"github.com/guiferpa/jackiechain/logger"
+	protogreeter "github.com/guiferpa/jackiechain/proto/greeter"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -26,8 +27,10 @@ func main() {
 
 	flag.Parse()
 
+	agentID := uuid.New().String()
+
 	addr := fmt.Sprintf("%s:%v", *serverHost, *serverPort)
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logger.Red(err.Error())
 		return
@@ -54,12 +57,14 @@ func main() {
 		act := args[0]
 
 		if strings.ToLower(act) == actions.GreeterPing {
-			resp, err := greeter.ReachOut(context.Background(), &protogreeter.PingRequest{})
+			resp, err := greeter.ReachOut(context.Background(), &protogreeter.PingRequest{
+				Aid: agentID,
+			})
 			if err != nil {
 				logger.Red(err.Error())
 				return
 			}
-			logger.Yellow(resp.Text)
+			logger.Yellow(fmt.Sprintf("Pong from peer %s", resp.Pid))
 		}
 
 		printPrompt()
