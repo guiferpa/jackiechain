@@ -3,12 +3,12 @@ syntax = "proto3";
 option go_package = "./dist/proto";
 
 service Greeter {
-  rpc ReachOut (PingRequest) returns (PongResponse) {}
+  rpc ReachOut (GreeterPingRequest) returns (GreeterPongResponse) {}
 }
 
-message PingRequest {}
+message GreeterPingRequest {}
 
-message PongResponse {
+message GreeterPongResponse {
   string text = 1;
 }
 

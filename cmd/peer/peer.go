@@ -10,17 +10,18 @@ import (
 	"github.com/guiferpa/jackiechain/logger"
 )
 
-type Server struct {
+type Peer struct {
+	ID string
 	proto.UnimplementedGreeterServer
 	Blockchain *blockchain.Blockchain
 }
 
-func (s *Server) ReachOut(ctx context.Context, pr *proto.PingRequest) (*proto.PongResponse, error) {
+func (s *Peer) ReachOut(ctx context.Context, pr *proto.PingRequest) (*proto.PongResponse, error) {
 	logger.Yellow("PING")
 	return &proto.PongResponse{Text: "PONG"}, nil
 }
 
-func (s *Server) SetBuildBlockInterval(ticker *time.Ticker) {
+func (s *Peer) SetBuildBlockInterval(ticker *time.Ticker) {
 	for {
 		select {
 		case <-ticker.C:
@@ -30,11 +31,10 @@ func (s *Server) SetBuildBlockInterval(ticker *time.Ticker) {
 				continue
 			}
 			logger.Magenta(fmt.Sprintf("Block %s was built", bh))
-
 		}
 	}
 }
 
-func NewServer(bc *blockchain.Blockchain) *Server {
-	return &Server{Blockchain: bc}
+func NewPeer(id string, bc *blockchain.Blockchain) *Peer {
+	return &Peer{ID: id, Blockchain: bc}
 }

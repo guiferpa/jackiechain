@@ -1,11 +1,13 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/guiferpa/jackiechain/block"
 	"github.com/guiferpa/jackiechain/blockchain"
 	"github.com/guiferpa/jackiechain/dist/proto"
@@ -15,6 +17,10 @@ import (
 )
 
 func main() {
+	serverPort := flag.Int("server-port", 9000, "server port")
+
+	flag.Parse()
+
 	bc := &blockchain.Blockchain{
 		Blocks:           make(block.BlockMap),
 		Txs:              make(transaction.TxMap),
@@ -25,11 +31,13 @@ func main() {
 		LatestBlock:      nil,
 	}
 
-	is := NewServer(bc)
+	peerID := uuid.New().String()
 
-	logger.Magenta(fmt.Sprint("Running gRPC server"))
+	logger.Magenta(fmt.Sprintf("Initializing peer %s", peerID))
 
-	listener, err := net.Listen("tcp", "localhost:9000")
+	p := NewPeer(peerID, bc)
+
+	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%v", *serverPort))
 	if err != nil {
 		logger.Red(err.Error())
 		return
@@ -37,9 +45,11 @@ func main() {
 
 	s := grpc.NewServer()
 
-	proto.RegisterGreeterServer(s, is)
+	proto.RegisterGreeterServer(s, p)
 
-	go is.SetBuildBlockInterval(time.NewTicker(time.Second * 5))
+	logger.Magenta(fmt.Sprintf("Running gRPC server on port %v", *serverPort))
+
+	go p.SetBuildBlockInterval(time.NewTicker(time.Second * 5))
 
 	if err := s.Serve(listener); err != nil {
 		logger.Red(err.Error())

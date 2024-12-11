@@ -3,10 +3,12 @@ package main
 import (
 	"bufio"
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/guiferpa/jackiechain/cmd/agent/actions"
 	"github.com/guiferpa/jackiechain/dist/proto"
 	"github.com/guiferpa/jackiechain/logger"
 
@@ -19,13 +21,19 @@ func printPrompt() {
 }
 
 func main() {
-	conn, err := grpc.Dial("localhost:9000", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	serverHost := flag.String("server-host", "0.0.0.0", "server host")
+	serverPort := flag.Int("server-port", 9000, "server port")
+
+	flag.Parse()
+
+	addr := fmt.Sprintf("%s:%v", *serverHost, *serverPort)
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logger.Red(err.Error())
 		return
 	}
 
-	client := proto.NewGreeterClient(conn)
+	greeter := proto.NewGreeterClient(conn)
 
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -45,8 +53,8 @@ func main() {
 
 		act := args[0]
 
-		if strings.ToLower(act) == "ping" {
-			resp, err := client.ReachOut(context.Background(), &proto.PingRequest{})
+		if strings.ToLower(act) == actions.GreeterPing {
+			resp, err := greeter.ReachOut(context.Background(), &proto.PingRequest{})
 			if err != nil {
 				logger.Red(err.Error())
 				return
