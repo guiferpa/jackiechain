@@ -6,19 +6,22 @@ import (
 	"time"
 
 	"github.com/guiferpa/jackiechain/blockchain"
-	"github.com/guiferpa/jackiechain/dist/proto"
 	"github.com/guiferpa/jackiechain/logger"
+	protogreeter "github.com/guiferpa/jackiechain/proto/greeter"
 )
 
+type PeerID string
+
 type Peer struct {
-	ID string
-	proto.UnimplementedGreeterServer
-	Blockchain *blockchain.Blockchain
+	ID                PeerID
+	PeerHandshakeList map[PeerID]Peer
+	Blockchain        *blockchain.Blockchain
+	protogreeter.UnimplementedGreeterServer
 }
 
-func (s *Peer) ReachOut(ctx context.Context, pr *proto.PingRequest) (*proto.PongResponse, error) {
+func (s *Peer) ReachOut(ctx context.Context, pr *protogreeter.PingRequest) (*protogreeter.PongResponse, error) {
 	logger.Yellow("PING")
-	return &proto.PongResponse{Text: "PONG"}, nil
+	return &protogreeter.PongResponse{Text: "PONG"}, nil
 }
 
 func (s *Peer) SetBuildBlockInterval(ticker *time.Ticker) {
@@ -35,6 +38,6 @@ func (s *Peer) SetBuildBlockInterval(ticker *time.Ticker) {
 	}
 }
 
-func NewPeer(id string, bc *blockchain.Blockchain) *Peer {
-	return &Peer{ID: id, Blockchain: bc}
+func NewPeer(id PeerID, bc *blockchain.Blockchain) *Peer {
+	return &Peer{ID: id, Blockchain: bc, PeerHandshakeList: make(map[PeerID]Peer, 0)}
 }

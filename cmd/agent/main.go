@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/guiferpa/jackiechain/cmd/agent/actions"
-	"github.com/guiferpa/jackiechain/dist/proto"
+	protogreeter "github.com/guiferpa/jackiechain/proto/greeter"
 	"github.com/guiferpa/jackiechain/logger"
 
 	"google.golang.org/grpc"
@@ -33,7 +33,7 @@ func main() {
 		return
 	}
 
-	greeter := proto.NewGreeterClient(conn)
+	greeter := protogreeter.NewGreeterClient(conn)
 
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -54,7 +54,7 @@ func main() {
 		act := args[0]
 
 		if strings.ToLower(act) == actions.GreeterPing {
-			resp, err := greeter.ReachOut(context.Background(), &proto.PingRequest{})
+			resp, err := greeter.ReachOut(context.Background(), &protogreeter.PingRequest{})
 			if err != nil {
 				logger.Red(err.Error())
 				return

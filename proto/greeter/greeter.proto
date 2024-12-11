@@ -1,0 +1,15 @@
+syntax = "proto3";
+option go_package = "github.com/guiferpa/jackiechain/proto/greeter";
+
+package greeter;
+
+service Greeter {
+  rpc ReachOut (PingRequest) returns (PongResponse) {}
+}
+
+message PingRequest {}
+
+message PongResponse {
+  string text = 1;
+}
+
