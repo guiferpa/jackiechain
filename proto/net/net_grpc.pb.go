@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Net_Connect_FullMethodName = "/net.Net/Connect"
+	Net_Connect_FullMethodName        = "/net.Net/Connect"
+	Net_SendConnection_FullMethodName = "/net.Net/SendConnection"
 )
 
 // NetClient is the client API for Net service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type NetClient interface {
 	Connect(ctx context.Context, in *ConnectRequest, opts ...grpc.CallOption) (*ConnectResponse, error)
+	SendConnection(ctx context.Context, in *SendConnectionRequest, opts ...grpc.CallOption) (*SendConnectionResponse, error)
 }
 
 type netClient struct {
@@ -47,11 +49,22 @@ func (c *netClient) Connect(ctx context.Context, in *ConnectRequest, opts ...grp
 	return out, nil
 }
 
+func (c *netClient) SendConnection(ctx context.Context, in *SendConnectionRequest, opts ...grpc.CallOption) (*SendConnectionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SendConnectionResponse)
+	err := c.cc.Invoke(ctx, Net_SendConnection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // NetServer is the server API for Net service.
 // All implementations must embed UnimplementedNetServer
 // for forward compatibility.
 type NetServer interface {
 	Connect(context.Context, *ConnectRequest) (*ConnectResponse, error)
+	SendConnection(context.Context, *SendConnectionRequest) (*SendConnectionResponse, error)
 	mustEmbedUnimplementedNetServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedNetServer struct{}
 
 func (UnimplementedNetServer) Connect(context.Context, *ConnectRequest) (*ConnectResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Connect not implemented")
+}
+func (UnimplementedNetServer) SendConnection(context.Context, *SendConnectionRequest) (*SendConnectionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendConnection not implemented")
 }
 func (UnimplementedNetServer) mustEmbedUnimplementedNetServer() {}
 func (UnimplementedNetServer) testEmbeddedByValue()             {}
@@ -104,6 +120,24 @@ func _Net_Connect_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Net_SendConnection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendConnectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NetServer).SendConnection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Net_SendConnection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NetServer).SendConnection(ctx, req.(*SendConnectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Net_ServiceDesc is the grpc.ServiceDesc for Net service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var Net_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Connect",
 			Handler:    _Net_Connect_Handler,
+		},
+		{
+			MethodName: "SendConnection",
+			Handler:    _Net_SendConnection_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

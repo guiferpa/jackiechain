@@ -5,6 +5,7 @@ package net;
 
 service Net {
   rpc Connect (ConnectRequest) returns (ConnectResponse) {}
+  rpc SendConnection (SendConnectionRequest) returns (SendConnectionResponse) {}
 }
 
 message ConnectRequest {
@@ -17,4 +18,12 @@ message ConnectResponse {
   uint32 status = 2;
 }
 
+message SendConnectionRequest {
+  string pid = 1;
+  string remote = 2;
+}
 
+message SendConnectionResponse {
+  string pid = 1;
+  uint32 status = 2;
+}

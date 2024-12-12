@@ -47,7 +47,7 @@ func main() {
 
 	cherr := make(chan error)
 	serving := make(chan struct{})
-	go p.Serve(listener, serving, cherr)
+	go p.Serve(listener, *nodeRemote, serving, cherr)
 	<-serving
 	logger.Magenta(fmt.Sprintf("Running gRPC server on port %v", *serverPort))
 
