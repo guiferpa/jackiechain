@@ -1,4 +1,4 @@
-package main
+package peer
 
 import (
 	"context"
@@ -10,11 +10,11 @@ import (
 	protogreeter "github.com/guiferpa/jackiechain/proto/greeter"
 )
 
-type PeerID string
+type ID string
 
 type Peer struct {
-	ID                PeerID
-	PeerHandshakeList map[PeerID]Peer
+	ID                ID
+	PeerHandshakeList map[ID]Peer
 	Blockchain        *blockchain.Blockchain
 	protogreeter.UnimplementedGreeterServer
 }
@@ -38,6 +38,6 @@ func (s *Peer) SetBuildBlockInterval(ticker *time.Ticker) {
 	}
 }
 
-func NewPeer(id PeerID, bc *blockchain.Blockchain) *Peer {
-	return &Peer{ID: id, Blockchain: bc, PeerHandshakeList: make(map[PeerID]Peer, 0)}
+func New(id ID, bc *blockchain.Blockchain) *Peer {
+	return &Peer{ID: id, Blockchain: bc, PeerHandshakeList: make(map[ID]Peer, 0)}
 }

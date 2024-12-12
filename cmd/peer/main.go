@@ -11,6 +11,7 @@ import (
 	"github.com/guiferpa/jackiechain/block"
 	"github.com/guiferpa/jackiechain/blockchain"
 	"github.com/guiferpa/jackiechain/logger"
+	"github.com/guiferpa/jackiechain/peer"
 	protogreeter "github.com/guiferpa/jackiechain/proto/greeter"
 	"github.com/guiferpa/jackiechain/transaction"
 	"google.golang.org/grpc"
@@ -35,7 +36,7 @@ func main() {
 
 	logger.Magenta(fmt.Sprintf("Initializing peer %s", peerID))
 
-	p := NewPeer(PeerID(peerID), bc)
+	p := peer.New(peer.ID(peerID), bc)
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%v", *serverPort))
 	if err != nil {
