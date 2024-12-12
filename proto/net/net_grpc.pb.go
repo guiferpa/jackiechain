@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.27.1
-// source: proto/peer/peer.proto
+// source: proto/net/net.proto
 
-package peer
+package net
 
 import (
 	context "context"
@@ -19,103 +19,103 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Peer_Connect_FullMethodName = "/peer.Peer/Connect"
+	Net_Connect_FullMethodName = "/net.Net/Connect"
 )
 
-// PeerClient is the client API for Peer service.
+// NetClient is the client API for Net service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type PeerClient interface {
+type NetClient interface {
 	Connect(ctx context.Context, in *ConnectRequest, opts ...grpc.CallOption) (*ConnectResponse, error)
 }
 
-type peerClient struct {
+type netClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewPeerClient(cc grpc.ClientConnInterface) PeerClient {
-	return &peerClient{cc}
+func NewNetClient(cc grpc.ClientConnInterface) NetClient {
+	return &netClient{cc}
 }
 
-func (c *peerClient) Connect(ctx context.Context, in *ConnectRequest, opts ...grpc.CallOption) (*ConnectResponse, error) {
+func (c *netClient) Connect(ctx context.Context, in *ConnectRequest, opts ...grpc.CallOption) (*ConnectResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ConnectResponse)
-	err := c.cc.Invoke(ctx, Peer_Connect_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, Net_Connect_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// PeerServer is the server API for Peer service.
-// All implementations must embed UnimplementedPeerServer
+// NetServer is the server API for Net service.
+// All implementations must embed UnimplementedNetServer
 // for forward compatibility.
-type PeerServer interface {
+type NetServer interface {
 	Connect(context.Context, *ConnectRequest) (*ConnectResponse, error)
-	mustEmbedUnimplementedPeerServer()
+	mustEmbedUnimplementedNetServer()
 }
 
-// UnimplementedPeerServer must be embedded to have
+// UnimplementedNetServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedPeerServer struct{}
+type UnimplementedNetServer struct{}
 
-func (UnimplementedPeerServer) Connect(context.Context, *ConnectRequest) (*ConnectResponse, error) {
+func (UnimplementedNetServer) Connect(context.Context, *ConnectRequest) (*ConnectResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Connect not implemented")
 }
-func (UnimplementedPeerServer) mustEmbedUnimplementedPeerServer() {}
-func (UnimplementedPeerServer) testEmbeddedByValue()              {}
+func (UnimplementedNetServer) mustEmbedUnimplementedNetServer() {}
+func (UnimplementedNetServer) testEmbeddedByValue()             {}
 
-// UnsafePeerServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to PeerServer will
+// UnsafeNetServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to NetServer will
 // result in compilation errors.
-type UnsafePeerServer interface {
-	mustEmbedUnimplementedPeerServer()
+type UnsafeNetServer interface {
+	mustEmbedUnimplementedNetServer()
 }
 
-func RegisterPeerServer(s grpc.ServiceRegistrar, srv PeerServer) {
-	// If the following call pancis, it indicates UnimplementedPeerServer was
+func RegisterNetServer(s grpc.ServiceRegistrar, srv NetServer) {
+	// If the following call pancis, it indicates UnimplementedNetServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&Peer_ServiceDesc, srv)
+	s.RegisterService(&Net_ServiceDesc, srv)
 }
 
-func _Peer_Connect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Net_Connect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ConnectRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PeerServer).Connect(ctx, in)
+		return srv.(NetServer).Connect(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Peer_Connect_FullMethodName,
+		FullMethod: Net_Connect_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PeerServer).Connect(ctx, req.(*ConnectRequest))
+		return srv.(NetServer).Connect(ctx, req.(*ConnectRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// Peer_ServiceDesc is the grpc.ServiceDesc for Peer service.
+// Net_ServiceDesc is the grpc.ServiceDesc for Net service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var Peer_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "peer.Peer",
-	HandlerType: (*PeerServer)(nil),
+var Net_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "net.Net",
+	HandlerType: (*NetServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "Connect",
-			Handler:    _Peer_Connect_Handler,
+			Handler:    _Net_Connect_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/peer/peer.proto",
+	Metadata: "proto/net/net.proto",
 }

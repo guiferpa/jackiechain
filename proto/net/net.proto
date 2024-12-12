@@ -1,18 +1,20 @@
 syntax = "proto3";
-option go_package = "github.com/guiferpa/jackiechain/proto/peer";
+option go_package = "github.com/guiferpa/jackiechain/proto/net";
 
-package peer;
+package net;
 
-service Peer {
+service Net {
   rpc Connect (ConnectRequest) returns (ConnectResponse) {}
 }
 
 message ConnectRequest {
   string pid = 1;
+  string remote = 2;
 }
 
 message ConnectResponse {
-  string status = 1;
+  string pid = 1;
+  uint32 status = 2;
 }
 
 

@@ -12,13 +12,14 @@ import (
 	"github.com/guiferpa/jackiechain/blockchain"
 	"github.com/guiferpa/jackiechain/logger"
 	"github.com/guiferpa/jackiechain/peer"
-	protogreeter "github.com/guiferpa/jackiechain/proto/greeter"
 	"github.com/guiferpa/jackiechain/transaction"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
 	serverPort := flag.Int("server-port", 9000, "server port")
+	nodeRemote := flag.String("node-remote", "", "node remote (no standalone config)")
 
 	flag.Parse()
 
@@ -44,16 +45,27 @@ func main() {
 		return
 	}
 
-	s := grpc.NewServer()
-
-	protogreeter.RegisterGreeterServer(s, p)
-
+	cherr := make(chan error)
+	serving := make(chan struct{})
+	go p.Serve(listener, serving, cherr)
+	<-serving
 	logger.Magenta(fmt.Sprintf("Running gRPC server on port %v", *serverPort))
 
 	go p.SetBuildBlockInterval(time.NewTicker(time.Second * 5))
 
-	if err := s.Serve(listener); err != nil {
-		logger.Red(err.Error())
-		os.Exit(1)
+	if *nodeRemote != "" {
+		conn, err := grpc.NewClient(*nodeRemote, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			logger.Red(err.Error())
+			os.Exit(2)
+		}
+		if err := p.TryConnect(conn); err != nil {
+			logger.Red(err.Error())
+			os.Exit(3)
+		}
 	}
+
+	err = <-cherr
+	logger.Red(err.Error())
+	os.Exit(1)
 }
